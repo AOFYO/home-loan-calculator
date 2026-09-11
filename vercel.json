@@ -1,0 +1,14 @@
+﻿{
+  rewrites: [
+    {
+      source: /api/(.*),
+      destination: /api/
+    }
+  ],
+  crons: [
+    {
+      path: /api/bot-rates,
+      schedule: 0 18 * * *
+    }
+  ]
+}
