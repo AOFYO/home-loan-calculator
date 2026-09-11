@@ -1,4 +1,4 @@
-﻿import { BankProgram, BankInfo, BotRateData, AmortizationRow, CalculationResult, FeeConfig, MRTACompany } from '../types/loan';
+import { BankProgram, BankInfo, BotRateData, AmortizationRow, CalculationResult, FeeConfig, MRTACompany, CustomBankOffer } from '../types/loan';
 
 /**
  * คำนวณค่างวดรายเดือนด้วยสูตร PMT มาตรฐาน
@@ -15,6 +15,54 @@ export function calculatePMT(principal: number, annualRatePercent: number, total
 }
 
 /**
+ * แปลง CustomBankOffer ให้กลายเป็น BankProgram + BankInfo
+ */
+export function convertCustomOfferToProgram(offer: CustomBankOffer, botRates?: Record<string, BotRateData>): { program: BankProgram; bank: BankInfo } {
+  const bank: BankInfo = {
+    id: offer.id,
+    code: 'CUSTOM',
+    nameTh: offer.bankName,
+    nameEn: offer.bankName,
+    color: offer.color || '#6366f1',
+    defaultMRR: 7.30,
+    defaultMLR: 7.05,
+    defaultMOR: 7.50,
+    programs: []
+  };
+
+  const periods: any[] = [
+    { yearFrom: 1, yearTo: 1, rateType: 'fixed', fixedRate: offer.rateYear1 },
+    { yearFrom: 2, yearTo: 2, rateType: 'fixed', fixedRate: offer.rateYear2 },
+    { yearFrom: 3, yearTo: 3, rateType: 'fixed', fixedRate: offer.rateYear3 },
+  ];
+
+  if (offer.rateYear4PlusType === 'fixed') {
+    periods.push({ yearFrom: 4, yearTo: null, rateType: 'fixed', fixedRate: offer.rateYear4PlusFixed });
+  } else {
+    periods.push({
+      yearFrom: 4,
+      yearTo: null,
+      rateType: 'floating',
+      baseRateType: offer.rateYear4PlusBase || 'MRR',
+      spread: offer.rateYear4PlusSpread || 0
+    });
+  }
+
+  const program: BankProgram = {
+    id: offer.id,
+    bankId: offer.id,
+    name: offer.bankName,
+    interestType: 'stepped',
+    description: `ปี 1: ${offer.rateYear1}%, ปี 2: ${offer.rateYear2}%, ปี 3: ${offer.rateYear3}%, ปี 4+: ${offer.rateYear4PlusType === 'fixed' ? offer.rateYear4PlusFixed + '%' : (offer.rateYear4PlusBase || 'MRR') + ' ' + (offer.rateYear4PlusSpread >= 0 ? '+' : '') + offer.rateYear4PlusSpread + '%'}`,
+    isCustom: true,
+    periods
+  };
+
+  bank.programs.push(program);
+  return { program, bank };
+}
+
+/**
  * หาอัตราดอกเบี้ยประจำปีตามปีที่ระบุในโปรแกรมสินเชื่อ
  */
 export function getRateForYear(
@@ -23,7 +71,6 @@ export function getRateForYear(
   bankInfo?: BankInfo,
   botRates?: Record<string, BotRateData>
 ): number {
-  // หาช่วงเวลาที่ตรงกับปี
   const period = program.periods.find(p => {
     if (p.yearTo === null) {
       return year >= p.yearFrom;
@@ -32,7 +79,6 @@ export function getRateForYear(
   });
 
   if (!period) {
-    // ถ้าไม่เจอ ให้ใช้ตัวสุดท้าย
     const last = program.periods[program.periods.length - 1];
     return last ? (last.fixedRate ?? 5.0) : 5.0;
   }
@@ -41,9 +87,8 @@ export function getRateForYear(
     return period.fixedRate ?? 0;
   }
 
-  // Floating rate (อิง MRR / MLR / MOR)
   const baseType = period.baseRateType || 'MRR';
-  let baseValue = 7.0; // fallback default
+  let baseValue = 7.0;
 
   if (bankInfo) {
     if (baseType === 'MRR') baseValue = bankInfo.defaultMRR;
@@ -51,7 +96,6 @@ export function getRateForYear(
     else if (baseType === 'MOR') baseValue = bankInfo.defaultMOR;
   }
 
-  // ถ้ามี BOT Rates อัพเดทใหม่ ให้ใช้อันนั้น
   if (bankInfo && botRates && botRates[bankInfo.code]) {
     const live = botRates[bankInfo.code];
     if (baseType === 'MRR' && live.mrr > 0) baseValue = live.mrr;
@@ -78,14 +122,12 @@ export function calculateMRTAPremium(
 
   if (!company) return 0;
 
-  // หาอายุที่ใกล้เคียงที่สุดในตาราง (25, 30, 35, 40, 45, 50)
   const availableAges = Object.keys(company.rates).map(Number).sort((a, b) => a - b);
   let closestAge = availableAges[0];
   for (const age of availableAges) {
     if (borrowerAge >= age) closestAge = age;
   }
 
-  // หาระยะคุ้มครองที่ใกล้เคียง (10, 15, 20, 25, 30)
   const ageRates = company.rates[closestAge];
   if (!ageRates) return 0;
 
@@ -147,14 +189,14 @@ export function calculateLoanProgram(
     includeMRTA: boolean;
     company?: MRTACompany;
     customRate?: number;
-    financeMRTAWithLoan?: boolean; // กู้รวมกับยอดบ้าน
+    financeMRTAWithLoan?: boolean;
+    mrtaDiscountRate?: number; // ส่วนลดดอกเบี้ยถ้าทำ MRTA
   },
   feeConfig: FeeConfig,
   botRates?: Record<string, BotRateData>
 ): CalculationResult {
   const totalMonths = loanTermYears * 12;
 
-  // คำนวณเบี้ย MRTA
   let mrtaPremium = 0;
   if (mrtaOption.includeMRTA) {
     mrtaPremium = calculateMRTAPremium(
@@ -166,7 +208,6 @@ export function calculateLoanProgram(
     );
   }
 
-  // วงเงินกู้ตั้งต้น (ถ้ารวม MRTA ในเงินกู้)
   const initialPrincipal = mrtaOption.financeMRTAWithLoan
     ? loanAmount + mrtaPremium
     : loanAmount;
@@ -180,24 +221,32 @@ export function calculateLoanProgram(
 
   let currentYear = 1;
   let remainingMonths = totalMonths;
-  let currentPMT = calculatePMT(balance, getRateForYear(program, 1, bankInfo, botRates), totalMonths);
+
+  // คำนวณอัตราพร้อมหักส่วนลด MRTA (ถ้ามี)
+  const getEffectiveRate = (yr: number) => {
+    let r = getRateForYear(program, yr, bankInfo, botRates);
+    if (mrtaOption.includeMRTA && mrtaOption.mrtaDiscountRate && yr <= 3) {
+      r = Math.max(0, r - mrtaOption.mrtaDiscountRate);
+    }
+    return r;
+  };
+
+  let currentPMT = calculatePMT(balance, getEffectiveRate(1), totalMonths);
 
   for (let m = 1; m <= totalMonths; m++) {
     const year = Math.ceil(m / 12);
 
-    // ปรับดอกเบี้ยและคำนวณ PMT ใหม่เมื่อเปลี่ยนปี
     if (year !== currentYear) {
       currentYear = year;
       remainingMonths = totalMonths - m + 1;
-      const rate = getRateForYear(program, year, bankInfo, botRates);
+      const rate = getEffectiveRate(year);
       currentPMT = calculatePMT(balance, rate, remainingMonths);
     }
 
-    const currentRate = getRateForYear(program, year, bankInfo, botRates);
+    const currentRate = getEffectiveRate(year);
     const monthlyRate = (currentRate / 100) / 12;
     const interest = Math.round(balance * monthlyRate);
 
-    // งวดสุดท้ายตัดยอดที่เหลือ
     let payment = currentPMT;
     let principal = payment - interest;
 
@@ -230,21 +279,17 @@ export function calculateLoanProgram(
     if (balance <= 0) break;
   }
 
-  // ค่าเฉลี่ยผ่อน 3 ปีแรก
   const avg3Years = first3YearsPayments.length > 0
     ? Math.round(first3YearsPayments.reduce((a, b) => a + b, 0) / first3YearsPayments.length)
     : currentPMT;
 
-  // ดอกเบี้ยเฉลี่ย 3 ปีแรก
   let sumRates3Years = 0;
   for (let y = 1; y <= 3; y++) {
-    sumRates3Years += getRateForYear(program, y, bankInfo, botRates);
+    sumRates3Years += getEffectiveRate(y);
   }
   const effectiveRate = Number((sumRates3Years / 3).toFixed(2));
 
-  // ค่าธรรมเนียม
   const fees = calculateAllFees(propertyPrice, loanAmount, loanTermYears, feeConfig);
-
   const totalLoanPayment = totalPrincipalPaid + totalInterest;
   const grandTotalCost = totalInterest + (mrtaOption.financeMRTAWithLoan ? 0 : mrtaPremium) + fees.totalFees;
 

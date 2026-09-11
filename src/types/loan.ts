@@ -1,4 +1,4 @@
-﻿export type InterestRateType = 'fixed' | 'floating' | 'stepped';
+export type InterestRateType = 'fixed' | 'floating' | 'stepped';
 
 export interface RatePeriod {
   yearFrom: number;
@@ -88,3 +88,40 @@ export interface BotRateData {
   updatedAt: string;
   source: 'live' | 'cache' | 'default';
 }
+
+export interface CustomBankOffer {
+  id: string;
+  bankName: string;
+  color: string;
+  rateYear1: number;
+  rateYear2: number;
+  rateYear3: number;
+  rateYear4PlusType: 'fixed' | 'floating';
+  rateYear4PlusFixed: number;
+  rateYear4PlusBase: 'MRR' | 'MLR' | 'MOR';
+  rateYear4PlusSpread: number;
+  mrtaDiscountRate: number; // เช่น 0.25 (ถ้าทำ MRTA ลดดอกเบี้ย 0.25% 3 ปีแรก)
+}
+
+export interface UserLoanProfile {
+  id: string;
+  name: string;
+  updatedAt: string;
+  propertyPrice: number;
+  loanAmount: number;
+  downPaymentAmount: number;
+  downPaymentPercent: number;
+  loanTermYears: number;
+  borrowerAge: number;
+  selectedBankIds: string[];
+  selectedPrograms: Record<string, string>;
+  customOffers: CustomBankOffer[];
+  includeMRTA: boolean;
+  selectedMRTAId: string;
+  isCustomMRTA: boolean;
+  customMRTACompany: string;
+  customMRTARate: number;
+  financeMRTAWithLoan: boolean;
+  isGovernmentMeasure: boolean;
+}
+
