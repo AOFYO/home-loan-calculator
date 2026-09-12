@@ -4,16 +4,22 @@ import {
   RefreshCw, 
   CheckCircle2, 
   BarChart3, 
-  Calendar,
-  Sparkles,
-  Plus,
-  Trash2,
-  Download,
-  Upload,
-  FolderOpen,
-  Sliders,
-  ChevronDown,
-  X
+  Calendar, 
+  Sparkles, 
+  Plus, 
+  Trash2, 
+  Download, 
+  Upload, 
+  FolderOpen, 
+  Sliders, 
+  ChevronDown, 
+  X,
+  FileText,
+  Printer,
+  Edit3,
+  Copy,
+  AlertTriangle,
+  Lightbulb
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -22,12 +28,14 @@ import {
   XAxis, 
   YAxis, 
   Tooltip as RechartsTooltip, 
-  Legend
+  Legend 
 } from 'recharts';
 
 import { DEFAULT_BANKS, DEFAULT_MRTA_COMPANIES, DEFAULT_FEE_CONFIG } from './data/masterData';
-import { calculateLoanProgram, calculateAllFees, convertCustomOfferToProgram } from './lib/calculator';
-import { BankInfo, BotRateData, CalculationResult, CustomBankOffer, UserLoanProfile } from './types/loan';
+import { calculateLoanProgram, calculateAllFees, convertCustomOfferToProgram, calculateAdvancedCustomOffer } from './lib/calculator';
+import { BankInfo, BotRateData, CalculationResult, CustomBankOffer, UserLoanProfile, AdvancedOfferCalculationResult } from './types/loan';
+import { AdvancedOfferModal } from './components/AdvancedOfferModal';
+import { NegotiationSheetModal } from './components/NegotiationSheetModal';
 
 export default function App() {
   // --- Form Inputs State (Default: Down payment 0, Term 30 years) ---
@@ -63,8 +71,13 @@ export default function App() {
   });
 
   const [customOffers, setCustomOffers] = useState<CustomBankOffer[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-  const [editingOffer, setEditingOffer] = useState<CustomBankOffer>({
+  const [resultsTab, setResultsTab] = useState<'custom' | 'standard'>('custom');
+  const [isAdvancedModalOpen, setIsAdvancedModalOpen] = useState<boolean>(false);
+  const [isNegotiationModalOpen, setIsNegotiationModalOpen] = useState<boolean>(false);
+  const [customViewMode, setCustomViewMode] = useState<'annual' | 'monthly'>('annual');
+  const [showFullTermCustom, setShowFullTermCustom] = useState<boolean>(false);
+  const [selectedAmortizationOfferId, setSelectedAmortizationOfferId] = useState<string>('');
+  const [editingAdvancedOffer, setEditingAdvancedOffer] = useState<CustomBankOffer>({
     id: '',
     bankName: '',
     color: '#6366f1',
@@ -75,7 +88,7 @@ export default function App() {
     rateYear4PlusFixed: 5.50,
     rateYear4PlusBase: 'MRR',
     rateYear4PlusSpread: -1.25,
-    mrtaDiscountRate: 0.25
+    mrtaDiscountRate: 0
   });
 
   const [includeMRTA, setIncludeMRTA] = useState<boolean>(true);
@@ -245,34 +258,310 @@ export default function App() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleSaveCustomOffer = () => {
-    if (!editingOffer.bankName.trim()) {
-      alert('กรุณากรอกชื่อธนาคารหรือข้อเสนอ');
-      return;
-    }
-
-    const offerId = editingOffer.id || 'custom_' + Date.now();
-    const newOffer = { ...editingOffer, id: offerId };
-
-    const idx = customOffers.findIndex(o => o.id === offerId);
-    let updatedOffers: CustomBankOffer[];
+  const handleSaveAdvancedOffer = (saved: CustomBankOffer) => {
+    const idx = customOffers.findIndex(o => o.id === saved.id);
+    let updated: CustomBankOffer[];
     if (idx >= 0) {
-      updatedOffers = [...customOffers];
-      updatedOffers[idx] = newOffer;
+      updated = [...customOffers];
+      updated[idx] = saved;
     } else {
-      updatedOffers = [...customOffers, newOffer];
+      updated = [...customOffers, saved];
     }
+    setCustomOffers(updated);
+    if (!selectedBankIds.includes(saved.id)) {
+      setSelectedBankIds([...selectedBankIds, saved.id]);
+    }
+    setIsAdvancedModalOpen(false);
+    setResultsTab('custom');
+  };
 
-    setCustomOffers(updatedOffers);
-    if (!selectedBankIds.includes(offerId)) {
-      setSelectedBankIds([...selectedBankIds, offerId]);
-    }
-    setIsModalOpen(false);
+  const handleOpenNewAdvancedOffer = () => {
+    setEditingAdvancedOffer({
+      id: '',
+      bankName: '',
+      color: '#6366f1',
+      rateYear1: 2.99,
+      rateYear2: 3.50,
+      rateYear3: 4.25,
+      rateYear4PlusType: 'floating',
+      rateYear4PlusFixed: 5.50,
+      rateYear4PlusBase: 'MRR',
+      rateYear4PlusSpread: -1.25,
+      mrtaDiscountRate: 0,
+      isAdvanced: true,
+      propertyPrice,
+      homeLoan: {
+        loanAmount,
+        termYears: loanTermYears,
+        rateYear1: 2.99,
+        rateYear2: 3.50,
+        rateYear3: 4.25,
+        rateYear4PlusType: 'floating',
+        rateYear4PlusFixed: 5.50,
+        rateYear4PlusBase: 'MRR',
+        rateYear4PlusSpread: -1.25
+      },
+      mrtaLoan: {
+        totalPremium: 120000,
+        financeWithLoan: true,
+        loanAmount: 120000,
+        termYears: 20,
+        rateYear1: 3.50,
+        rateYear2: 4.00,
+        rateYear3: 4.50,
+        rateYear4PlusType: 'floating',
+        rateYear4PlusFixed: 6.00,
+        rateYear4PlusBase: 'MRR',
+        rateYear4PlusSpread: -1.00
+      },
+      prepayment: {
+        mode: 'target_monthly',
+        targetMonthlyYear1: 16000,
+        targetMonthlyYear2: 18000,
+        targetMonthlyYear3: 20000,
+        targetMonthlyYear4Plus: 22000,
+        allocation: 'smart_auto'
+      },
+      fees: {
+        mortgageFee: { payer: 'bank' },
+        transferFee: { payer: 'borrower' },
+        appraisalFee: { payer: 'bank' },
+        stampDuty: { payer: 'borrower' },
+        fireInsurance: { payer: 'borrower' }
+      },
+      perks: [
+        { id: 'p1', name: 'เงินคืนเข้าบัญชี (Cashback)', value: 10000, type: 'cashback' }
+      ],
+      lockInYears: 3
+    });
+    setIsAdvancedModalOpen(true);
+  };
+
+  const handleEditAdvancedOffer = (offer: CustomBankOffer) => {
+    setEditingAdvancedOffer({ ...offer });
+    setIsAdvancedModalOpen(true);
+  };
+
+  const handleDuplicateAdvancedOffer = (offer: CustomBankOffer) => {
+    const copyOffer: CustomBankOffer = {
+      ...offer,
+      id: 'custom_' + Date.now(),
+      bankName: `${offer.bankName} (สำเนา)`
+    };
+    setCustomOffers([...customOffers, copyOffer]);
+    setSelectedBankIds([...selectedBankIds, copyOffer.id]);
   };
 
   const handleDeleteCustomOffer = (offerId: string) => {
     setCustomOffers(customOffers.filter(o => o.id !== offerId));
     setSelectedBankIds(selectedBankIds.filter(id => id !== offerId));
+  };
+
+  const handleSeedSampleOffers = () => {
+    const sample1: CustomBankOffer = {
+      id: 'sample_ghb',
+      bankName: 'ธอส. สวัสดิการ (GHB Privilege)',
+      color: '#f97316',
+      rateYear1: 1.99,
+      rateYear2: 2.99,
+      rateYear3: 3.99,
+      rateYear4PlusType: 'floating',
+      rateYear4PlusFixed: 5.80,
+      rateYear4PlusBase: 'MRR',
+      rateYear4PlusSpread: -1.50,
+      mrtaDiscountRate: 0,
+      isAdvanced: true,
+      propertyPrice,
+      homeLoan: {
+        loanAmount,
+        termYears: loanTermYears,
+        rateYear1: 1.99,
+        rateYear2: 2.99,
+        rateYear3: 3.99,
+        rateYear4PlusType: 'floating',
+        rateYear4PlusFixed: 5.80,
+        rateYear4PlusBase: 'MRR',
+        rateYear4PlusSpread: -1.50,
+        bankInstallmentYear1: 12500,
+        bankInstallmentYear2: 13500,
+        bankInstallmentYear3: 15000,
+        bankInstallmentYear4Plus: 17000
+      },
+      mrtaLoan: {
+        totalPremium: 110000,
+        financeWithLoan: true,
+        loanAmount: 110000,
+        termYears: 15,
+        rateYear1: 3.50,
+        rateYear2: 4.00,
+        rateYear3: 4.50,
+        rateYear4PlusType: 'floating',
+        rateYear4PlusFixed: 6.00,
+        rateYear4PlusBase: 'MRR',
+        rateYear4PlusSpread: -1.00,
+        bankInstallmentYear1: 1000,
+        bankInstallmentYear2: 1000,
+        bankInstallmentYear3: 1000,
+        bankInstallmentYear4Plus: 1200
+      },
+      prepayment: {
+        mode: 'target_monthly',
+        targetMonthlyYear1: 16000,
+        targetMonthlyYear2: 18000,
+        targetMonthlyYear3: 20000,
+        targetMonthlyYear4Plus: 22000,
+        allocation: 'smart_auto'
+      },
+      fees: {
+        mortgageFee: { payer: 'bank' },
+        transferFee: { payer: 'borrower' },
+        appraisalFee: { payer: 'bank' },
+        stampDuty: { payer: 'borrower' },
+        fireInsurance: { payer: 'borrower' }
+      },
+      perks: [
+        { id: 'p1', name: 'เงินคืนเข้าบัญชี (Cashback)', value: 10000, type: 'cashback' }
+      ],
+      lockInYears: 3,
+      notes: 'ข้อเสนอพิเศษสวัสดิการหน่วยงานรัฐ'
+    };
+
+    const sample2: CustomBankOffer = {
+      id: 'sample_kbank',
+      bankName: 'KBank โปรโมชันพิเศษ (KBank Special)',
+      color: '#10b981',
+      rateYear1: 2.50,
+      rateYear2: 2.95,
+      rateYear3: 3.50,
+      rateYear4PlusType: 'fixed',
+      rateYear4PlusFixed: 5.50,
+      rateYear4PlusBase: 'MRR',
+      rateYear4PlusSpread: -1.25,
+      mrtaDiscountRate: 0,
+      isAdvanced: true,
+      propertyPrice,
+      homeLoan: {
+        loanAmount,
+        termYears: loanTermYears,
+        rateYear1: 2.50,
+        rateYear2: 2.95,
+        rateYear3: 3.50,
+        rateYear4PlusType: 'fixed',
+        rateYear4PlusFixed: 5.50,
+        rateYear4PlusBase: 'MRR',
+        rateYear4PlusSpread: -1.25,
+        bankInstallmentYear1: 13000,
+        bankInstallmentYear2: 13000,
+        bankInstallmentYear3: 14000,
+        bankInstallmentYear4Plus: 17000
+      },
+      mrtaLoan: {
+        totalPremium: 120000,
+        financeWithLoan: true,
+        loanAmount: 120000,
+        termYears: 20,
+        rateYear1: 2.50,
+        rateYear2: 2.95,
+        rateYear3: 3.50,
+        rateYear4PlusType: 'fixed',
+        rateYear4PlusFixed: 5.50,
+        rateYear4PlusBase: 'MRR',
+        rateYear4PlusSpread: -1.25,
+        bankInstallmentYear1: 1000,
+        bankInstallmentYear2: 1000,
+        bankInstallmentYear3: 1000,
+        bankInstallmentYear4Plus: 1100
+      },
+      prepayment: {
+        mode: 'target_monthly',
+        targetMonthlyYear1: 16000,
+        targetMonthlyYear2: 18000,
+        targetMonthlyYear3: 20000,
+        targetMonthlyYear4Plus: 22000,
+        allocation: 'smart_auto'
+      },
+      fees: {
+        mortgageFee: { payer: 'borrower' },
+        transferFee: { payer: 'borrower' },
+        appraisalFee: { payer: 'bank' },
+        stampDuty: { payer: 'bank' },
+        fireInsurance: { payer: 'borrower' }
+      },
+      perks: [
+        { id: 'p2', name: 'สลากออมสินพิเศษ', value: 15000, type: 'lottery' },
+        { id: 'p3', name: 'บัตรกำนัล HomePro', value: 5000, type: 'voucher' }
+      ],
+      lockInYears: 5,
+      notes: 'โปรโมชันแพ็กเกจของแถม ห้ามรีไฟแนนซ์ 5 ปี'
+    };
+
+    setCustomOffers([sample1, sample2]);
+    setSelectedBankIds(['sample_ghb', 'sample_kbank']);
+    setResultsTab('custom');
+  };
+
+  const handleDuplicateBankToCustom = (bank: BankInfo) => {
+    const programId = selectedPrograms[bank.id] || bank.programs[0]?.id;
+    const program = bank.programs.find(p => p.id === programId) || bank.programs[0];
+    const newOffer: CustomBankOffer = {
+      id: 'custom_' + Date.now(),
+      bankName: `${bank.nameTh} (${program?.name || 'กำหนดเอง'})`,
+      color: bank.color,
+      rateYear1: 2.99,
+      rateYear2: 3.50,
+      rateYear3: 4.25,
+      rateYear4PlusType: 'floating',
+      rateYear4PlusFixed: 5.50,
+      rateYear4PlusBase: 'MRR',
+      rateYear4PlusSpread: -1.25,
+      mrtaDiscountRate: 0,
+      isAdvanced: true,
+      propertyPrice,
+      homeLoan: {
+        loanAmount,
+        termYears: loanTermYears,
+        rateYear1: 2.99,
+        rateYear2: 3.50,
+        rateYear3: 4.25,
+        rateYear4PlusType: 'floating',
+        rateYear4PlusFixed: 5.50,
+        rateYear4PlusBase: 'MRR',
+        rateYear4PlusSpread: -1.25
+      },
+      mrtaLoan: {
+        totalPremium: 120000,
+        financeWithLoan: true,
+        loanAmount: 120000,
+        termYears: 20,
+        rateYear1: 3.50,
+        rateYear2: 4.00,
+        rateYear3: 4.50,
+        rateYear4PlusType: 'floating',
+        rateYear4PlusFixed: 6.00,
+        rateYear4PlusBase: 'MRR',
+        rateYear4PlusSpread: -1.00
+      },
+      prepayment: {
+        mode: 'target_monthly',
+        targetMonthlyYear1: 16000,
+        targetMonthlyYear2: 18000,
+        targetMonthlyYear3: 20000,
+        targetMonthlyYear4Plus: 22000,
+        allocation: 'smart_auto'
+      },
+      fees: {
+        mortgageFee: { payer: 'borrower' },
+        transferFee: { payer: 'borrower' },
+        appraisalFee: { payer: 'bank' },
+        stampDuty: { payer: 'borrower' },
+        fireInsurance: { payer: 'borrower' }
+      },
+      perks: [],
+      lockInYears: 3
+    };
+
+    setEditingAdvancedOffer(newOffer);
+    setIsAdvancedModalOpen(true);
   };
 
   const [feeConfig, setFeeConfig] = useState(DEFAULT_FEE_CONFIG);
@@ -423,6 +712,33 @@ export default function App() {
   const bestResult = useMemo(() => {
     return calculationResults.find(r => r.isBestPick) || calculationResults[0];
   }, [calculationResults]);
+
+  const advancedCustomResults = useMemo<AdvancedOfferCalculationResult[]>(() => {
+    return customOffers.map(offer => {
+      return calculateAdvancedCustomOffer(
+        offer,
+        propertyPrice,
+        loanAmount,
+        loanTermYears,
+        borrowerAge,
+        feeConfig,
+        botRates
+      );
+    });
+  }, [customOffers, propertyPrice, loanAmount, loanTermYears, borrowerAge, feeConfig, botRates]);
+
+  const bestCustomPick = useMemo(() => {
+    if (advancedCustomResults.length === 0) return null;
+    return [...advancedCustomResults].sort((a, b) => a.trueNetCost3Years - b.trueNetCost3Years)[0];
+  }, [advancedCustomResults]);
+
+  const activeAmortizationOffer = useMemo(() => {
+    if (advancedCustomResults.length === 0) return null;
+    return (
+      advancedCustomResults.find(r => r.offer.id === (selectedAmortizationOfferId || customOffers[0]?.id)) ||
+      advancedCustomResults[0]
+    );
+  }, [advancedCustomResults, selectedAmortizationOfferId, customOffers]);
 
   const barChartData = useMemo(() => {
     return calculationResults.map(r => ({
@@ -697,25 +1013,10 @@ export default function App() {
                 </h2>
                 <button
                   type='button'
-                  onClick={() => {
-                    setEditingOffer({
-                      id: '',
-                      bankName: '',
-                      color: '#6366f1',
-                      rateYear1: 2.99,
-                      rateYear2: 3.50,
-                      rateYear3: 4.25,
-                      rateYear4PlusType: 'floating',
-                      rateYear4PlusFixed: 5.50,
-                      rateYear4PlusBase: 'MRR',
-                      rateYear4PlusSpread: -1.25,
-                      mrtaDiscountRate: 0.25
-                    });
-                    setIsModalOpen(true);
-                  }}
-                  className='inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-2.5 py-1.5 rounded-lg transition min-h-[36px]'
+                  onClick={handleOpenNewAdvancedOffer}
+                  className='inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition min-h-[36px]'
                 >
-                  <Plus className='w-3.5 h-3.5' /> กรอกดอกเบี้ยเอง
+                  <Plus className='w-3.5 h-3.5' /> ➕ เพิ่มข้อเสนอจริง (Advanced)
                 </button>
               </div>
 
@@ -754,10 +1055,20 @@ export default function App() {
                         {offer.bankName}
                       </button>
                       <button
+                        type='button'
+                        onClick={() => handleEditAdvancedOffer(offer)}
+                        title='แก้ไขข้อเสนอ'
+                        className='px-2 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 transition min-h-[40px]'
+                      >
+                        <Edit3 className='w-3.5 h-3.5' />
+                      </button>
+                      <button
+                        type='button'
                         onClick={() => handleDeleteCustomOffer(offer.id)}
+                        title='ลบข้อเสนอ'
                         className='px-2 py-2 bg-indigo-50 hover:bg-rose-100 text-rose-500 transition min-h-[40px]'
                       >
-                        <X className='w-3.5 h-3.5' />
+                        <Trash2 className='w-3.5 h-3.5' />
                       </button>
                     </div>
                   );
@@ -936,153 +1247,710 @@ export default function App() {
           </div>
 
           {/* Right Column: Results */}
-          <div className='lg:col-span-7 space-y-6'>
+          <div ref={resultsRef} className='lg:col-span-7 space-y-6'>
             
-            {/* Best Value Highlight */}
-            {calculationResults.find(r => r.isBestPick) && (
-              <div className='bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-2xl p-6 shadow-md'>
-                <div className='inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/20 text-xs font-bold mb-2'>
-                  <CheckCircle2 className='w-3.5 h-3.5' /> ต้นทุนรวมต่ำที่สุด (Best Pick)
+            {/* Top Tab Switcher & Action Bar */}
+            <div className='flex flex-wrap items-center justify-between gap-3 bg-white p-2.5 rounded-2xl border border-slate-200 shadow-xs'>
+              <div className='flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl'>
+                <button
+                  type='button'
+                  onClick={() => setResultsTab('custom')}
+                  className={`px-3.5 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 min-h-[40px] ${
+                    resultsTab === 'custom'
+                      ? 'bg-white text-indigo-700 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Sparkles className='w-3.5 h-3.5 text-indigo-600' />
+                  <span>ข้อเสนอจริงของฉัน</span>
+                  {customOffers.length > 0 && (
+                    <span className='ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-indigo-100 text-indigo-800 font-extrabold'>
+                      {customOffers.length}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  type='button'
+                  onClick={() => setResultsTab('standard')}
+                  className={`px-3.5 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 min-h-[40px] ${
+                    resultsTab === 'standard'
+                      ? 'bg-white text-blue-700 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Building2 className='w-3.5 h-3.5 text-blue-600' />
+                  <span>ธนาคารทั่วไป (Market Standards)</span>
+                  <span className='ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-slate-200 text-slate-700 font-extrabold'>
+                    {banks.length}
+                  </span>
+                </button>
+              </div>
+
+              {customOffers.length > 0 && (
+                <button
+                  type='button'
+                  onClick={() => setIsNegotiationModalOpen(true)}
+                  className='inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-xs transition min-h-[40px]'
+                >
+                  <Printer className='w-3.5 h-3.5' />
+                  <span>ใบเจรจาดอกเบี้ย (Negotiation Sheet)</span>
+                </button>
+              )}
+            </div>
+
+            {/* TAB CONTENT: ข้อเสนอจริงของฉัน (CUSTOM OFFERS) */}
+            {resultsTab === 'custom' && (
+              <div className='space-y-6'>
+                {customOffers.length === 0 ? (
+                  /* Empty State */
+                  <div className='bg-white rounded-3xl p-8 border-2 border-dashed border-indigo-200 text-center space-y-4 shadow-xs'>
+                    <div className='w-14 h-14 mx-auto rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center'>
+                      <Sparkles className='w-7 h-7' />
+                    </div>
+                    <div className='max-w-md mx-auto'>
+                      <h3 className='text-base font-bold text-slate-900'>ยังไม่มีข้อเสนอจริงที่คุณบันทึกไว้</h3>
+                      <p className='text-xs text-slate-500 mt-1'>
+                        คุณได้รับเอกสารข้อเสนอจากธนาคารมาแล้วใช่ไหม? บันทึกแยกวงเงินกู้บ้าน & MRTA ค่างวดเรียกเก็บจริง และแผนผ่อนโปะ เพื่อคำนวณต้นทุนสุทธิแท้จริง 3 ปีแรก (True Net Cost) ได้ทันที
+                      </p>
+                    </div>
+                    <div className='flex flex-wrap justify-center gap-3 pt-2'>
+                      <button
+                        type='button'
+                        onClick={handleOpenNewAdvancedOffer}
+                        className='px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-500/20 flex items-center gap-1.5 min-h-[44px]'
+                      >
+                        <Plus className='w-4 h-4' /> สร้างข้อเสนอจริงใหม่
+                      </button>
+                      <button
+                        type='button'
+                        onClick={handleSeedSampleOffers}
+                        className='px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center gap-1.5 min-h-[44px]'
+                      >
+                        <Sparkles className='w-4 h-4 text-indigo-600' /> โหลด 2 ตัวอย่างข้อเสนอจริงมาทดลอง
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {/* Top Action & Sub-heading */}
+                    <div className='flex items-center justify-between'>
+                      <div className='text-xs text-slate-600 font-medium'>
+                        กำลังเปรียบเทียบ <span className='font-bold text-indigo-700'>{customOffers.length}</span> ข้อเสนอเฉพาะคุณ
+                      </div>
+                      <button
+                        type='button'
+                        onClick={handleOpenNewAdvancedOffer}
+                        className='inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition min-h-[38px]'
+                      >
+                        <Plus className='w-3.5 h-3.5' /> เพิ่มข้อเสนออีก
+                      </button>
+                    </div>
+
+                    {/* Best Pick 3-Year Focus Banner */}
+                    {bestCustomPick && (
+                      <div className='bg-gradient-to-br from-indigo-900 via-indigo-800 to-slate-900 text-white rounded-3xl p-6 shadow-xl relative overflow-hidden'>
+                        <div className='absolute -right-6 -bottom-6 w-32 h-32 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none' />
+                        
+                        <div className='flex items-center justify-between mb-3'>
+                          <div className='inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-bold'>
+                            <CheckCircle2 className='w-3.5 h-3.5 text-emerald-400' />
+                            คุ้มค่าที่สุดในรอบ 3 ปีแรก (Best Pick 3-Year True Net Cost)
+                          </div>
+                          {bestCustomPick.offer.lockInYears >= 5 ? (
+                            <span className='px-2.5 py-0.5 rounded-full bg-rose-500/20 border border-rose-400/30 text-rose-300 text-[11px] font-bold flex items-center gap-1'>
+                              <AlertTriangle className='w-3 h-3' /> ห้ามรีไฟแนนซ์ {bestCustomPick.offer.lockInYears} ปี
+                            </span>
+                          ) : (
+                            <span className='px-2 py-0.5 rounded-full bg-white/10 text-[11px] font-medium text-slate-300'>
+                              รีไฟแนนซ์ได้หลังปี 3
+                            </span>
+                          )}
+                        </div>
+
+                        <h3 className='text-xl md:text-2xl font-black tracking-tight text-white mb-1'>
+                          {bestCustomPick.offer.bankName}
+                        </h3>
+                        <p className='text-xs text-indigo-200 mb-4 line-clamp-1'>
+                          {bestCustomPick.offer.notes || 'วิเคราะห์เปรียบเทียบด้วยเงื่อนไขจริง แยกวงเงินบ้าน & MRTA'}
+                        </p>
+
+                        <div className='grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-indigo-700/50'>
+                          <div className='bg-white/5 rounded-xl p-3 border border-white/10'>
+                            <div className='text-[11px] text-indigo-200 font-medium'>ดอกเบี้ย 3 ปีแรก (บ้าน + MRTA)</div>
+                            <div className='text-lg font-black text-white'>
+                              {bestCustomPick.interest3YearsTotal.toLocaleString()} <span className='text-xs font-normal text-indigo-300'>฿</span>
+                            </div>
+                            <div className='text-[10px] text-indigo-300 mt-0.5'>
+                              บ้าน: {bestCustomPick.interest3YearsHome.toLocaleString()} | MRTA: {bestCustomPick.interest3YearsMRTA.toLocaleString()}
+                            </div>
+                          </div>
+
+                          <div className='bg-white/5 rounded-xl p-3 border border-white/10'>
+                            <div className='text-[11px] text-indigo-200 font-medium'>ผ่อนเฉลี่ยรายเดือน (3 ปีแรก)</div>
+                            <div className='text-lg font-black text-emerald-400'>
+                              {bestCustomPick.monthlyPaymentFirst3YearsAvg.toLocaleString()} <span className='text-xs font-normal text-indigo-300'>฿/ด.</span>
+                            </div>
+                            <div className='text-[10px] text-indigo-300 mt-0.5'>
+                              {bestCustomPick.offer.prepayment.mode === 'target_monthly' ? 'รวมยอดตั้งใจผ่อนโปะแล้ว' : 'ผ่อนตามเรียกเก็บ'}
+                            </div>
+                          </div>
+
+                          <div className='bg-amber-400/10 rounded-xl p-3 border border-amber-400/30'>
+                            <div className='text-[11px] text-amber-200 font-bold'>ต้นทุนสุทธิแท้จริง 3 ปี (True Net Cost)</div>
+                            <div className='text-lg font-black text-amber-300'>
+                              {bestCustomPick.trueNetCost3Years.toLocaleString()} <span className='text-xs font-normal text-amber-200'>฿</span>
+                            </div>
+                            <div className='text-[10px] text-amber-200/80 mt-0.5'>
+                              หักของแถม {bestCustomPick.totalPerksValue.toLocaleString()} ฿ แล้ว
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Smart Prepayment Advisory & Lock-in Alerts */}
+                    {bestCustomPick?.advisories && bestCustomPick.advisories.length > 0 && (
+                      <div className='bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 shadow-xs space-y-2'>
+                        <div className='flex items-center gap-2 text-xs font-bold text-amber-900'>
+                          <Lightbulb className='w-4 h-4 text-amber-600' />
+                          คำแนะนำกลยุทธ์การผ่อนชำระ & ข้อควรระวัง (Smart Advisory)
+                        </div>
+                        <div className='space-y-1.5 pl-6'>
+                          {bestCustomPick.advisories.map((adv, i) => (
+                            <div key={i} className='text-xs text-amber-800 leading-relaxed list-disc list-item'>
+                              {adv}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Cards Grid for Custom Offers */}
+                    <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                      {advancedCustomResults.map(res => {
+                        const isBest = bestCustomPick?.offer.id === res.offer.id;
+                        return (
+                          <div
+                            key={res.offer.id}
+                            className={`bg-white rounded-2xl p-5 border transition-all ${
+                              isBest 
+                                ? 'border-indigo-500 ring-2 ring-indigo-500/20 shadow-md' 
+                                : 'border-slate-200 shadow-xs hover:border-slate-300'
+                            }`}
+                          >
+                            {/* Card Top */}
+                            <div className='flex items-start justify-between gap-2 mb-3'>
+                              <div>
+                                <div className='flex items-center gap-1.5'>
+                                  <span className='w-2.5 h-2.5 rounded-full' style={{ backgroundColor: res.offer.color }} />
+                                  <h4 className='text-sm font-bold text-slate-900'>{res.offer.bankName}</h4>
+                                </div>
+                                {res.offer.notes && (
+                                  <p className='text-[11px] text-slate-500 line-clamp-1 mt-0.5'>{res.offer.notes}</p>
+                                )}
+                              </div>
+                              
+                              <div className='flex items-center gap-1'>
+                                <button
+                                  type='button'
+                                  onClick={() => handleEditAdvancedOffer(res.offer)}
+                                  title='แก้ไขข้อเสนอนี้'
+                                  className='p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 min-h-[36px]'
+                                >
+                                  <Edit3 className='w-3.5 h-3.5' />
+                                </button>
+                                <button
+                                  type='button'
+                                  onClick={() => handleDuplicateAdvancedOffer(res.offer)}
+                                  title='ทำสำเนาข้อเสนอนี้'
+                                  className='p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 min-h-[36px]'
+                                >
+                                  <Copy className='w-3.5 h-3.5' />
+                                </button>
+                                <button
+                                  type='button'
+                                  onClick={() => handleDeleteCustomOffer(res.offer.id)}
+                                  title='ลบข้อเสนอนี้'
+                                  className='p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 min-h-[36px]'
+                                >
+                                  <Trash2 className='w-3.5 h-3.5' />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Lock-in and tags */}
+                            <div className='flex flex-wrap items-center gap-1.5 mb-3'>
+                              {isBest && (
+                                <span className='px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold'>
+                                  ⭐ คุ้มค่าที่สุด 3 ปี
+                                </span>
+                              )}
+                              {res.offer.lockInYears >= 5 ? (
+                                <span className='px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[10px] font-bold flex items-center gap-1'>
+                                  <AlertTriangle className='w-3 h-3' /> ล็อกสัญญา {res.offer.lockInYears} ปี
+                                </span>
+                              ) : (
+                                <span className='px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-medium'>
+                                  สัญญามาตรฐาน {res.offer.lockInYears} ปี
+                                </span>
+                              )}
+                              {res.offer.mrtaLoan.financeWithLoan ? (
+                                <span className='px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 text-[10px] font-medium'>
+                                  กู้เพิ่ม MRTA {(res.offer.mrtaLoan.loanAmount || 0).toLocaleString()} ฿
+                                </span>
+                              ) : (
+                                <span className='px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-medium'>
+                                  MRTA จ่ายสด {res.offer.mrtaLoan.totalPremium.toLocaleString()} ฿
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Dual Accounts details */}
+                            <div className='bg-slate-50 rounded-xl p-3 space-y-1.5 text-xs text-slate-600 mb-3 border border-slate-100'>
+                              <div className='flex justify-between items-center'>
+                                <span className='font-semibold text-slate-800'>วงเงินกู้บ้าน</span>
+                                <span className='font-bold text-slate-900'>{res.offer.homeLoan.loanAmount.toLocaleString()} ฿ ({res.offer.homeLoan.termYears} ปี)</span>
+                              </div>
+                              <div className='flex justify-between text-[11px] text-slate-500'>
+                                <span>ดอกเบี้ยบ้านเฉลี่ย 3 ปี</span>
+                                <span className='font-semibold text-blue-600'>
+                                  {((res.offer.homeLoan.rateYear1 + res.offer.homeLoan.rateYear2 + res.offer.homeLoan.rateYear3) / 3).toFixed(2)}%
+                                </span>
+                              </div>
+                              {res.offer.mrtaLoan.financeWithLoan && (
+                                <>
+                                  <div className='flex justify-between items-center pt-1 border-t border-slate-200/60'>
+                                    <span className='font-semibold text-slate-800'>วงเงินกู้ MRTA</span>
+                                    <span className='font-bold text-purple-700'>{(res.offer.mrtaLoan.loanAmount || 0).toLocaleString()} ฿ ({res.offer.mrtaLoan.termYears} ปี)</span>
+                                  </div>
+                                  <div className='flex justify-between text-[11px] text-slate-500'>
+                                    <span>ดอกเบี้ย MRTA เฉลี่ย 3 ปี</span>
+                                    <span className='font-semibold text-purple-600'>
+                                      {((res.offer.mrtaLoan.rateYear1 + res.offer.mrtaLoan.rateYear2 + res.offer.mrtaLoan.rateYear3) / 3).toFixed(2)}%
+                                    </span>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+
+                            {/* Cost details */}
+                            <div className='space-y-1.5 text-xs py-2 border-y border-slate-100 mb-3'>
+                              <div className='flex justify-between'>
+                                <span className='text-slate-500'>ดอกเบี้ย 3 ปีแรก (บ้าน + MRTA)</span>
+                                <span className='font-bold text-rose-600'>{res.interest3YearsTotal.toLocaleString()} ฿</span>
+                              </div>
+                              <div className='flex justify-between'>
+                                <span className='text-slate-500'>ผ่อนเฉลี่ย 3 ปีแรก</span>
+                                <span className='font-bold text-slate-900'>{res.monthlyPaymentFirst3YearsAvg.toLocaleString()} ฿/ด.</span>
+                              </div>
+                              <div className='flex justify-between'>
+                                <span className='text-slate-500'>ค่าธรรมเนียมที่ผู้กู้จ่ายเอง</span>
+                                <span className='font-medium text-slate-700'>{res.borrowerPaidFees.toLocaleString()} ฿</span>
+                              </div>
+                              {res.totalPerksValue > 0 && (
+                                <div className='flex justify-between text-emerald-600'>
+                                  <span>สิทธิประโยชน์ & Cashback</span>
+                                  <span className='font-bold'>- {res.totalPerksValue.toLocaleString()} ฿</span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Prepayment benefits if any */}
+                            {res.prepaymentSavingsInterest > 0 && (
+                              <div className='mb-3 p-2 bg-emerald-50 rounded-lg text-[11px] text-emerald-800 flex items-center justify-between'>
+                                <span>💰 ผลจากการผ่อนโปะ:</span>
+                                <span className='font-bold'>ประหยัดดอก {res.prepaymentSavingsInterest.toLocaleString()} ฿ (ลดเวลา {res.prepaymentYearsSaved} ปี)</span>
+                              </div>
+                            )}
+
+                            {/* True Net Cost 3 Years Highlight */}
+                            <div className='bg-indigo-50/60 p-3 rounded-xl border border-indigo-100 flex items-baseline justify-between mb-3'>
+                              <div>
+                                <div className='text-[11px] font-bold text-indigo-900'>ต้นทุนสุทธิแท้จริง 3 ปีแรก</div>
+                                <div className='text-[10px] text-indigo-600'>True Net Cost (3 Yrs)</div>
+                              </div>
+                              <div className='text-right'>
+                                <div className='text-lg font-extrabold text-indigo-700'>
+                                  {res.trueNetCost3Years.toLocaleString()} <span className='text-xs font-normal'>฿</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className='flex items-center justify-between text-[11px] text-slate-500 pt-1'>
+                              <span>ต้นทุนสุทธิตลอดสัญญา:</span>
+                              <span className='font-semibold text-slate-800'>{res.trueNetCostLifetime.toLocaleString()} ฿</span>
+                            </div>
+
+                            <button
+                              type='button'
+                              onClick={() => {
+                                setSelectedAmortizationOfferId(res.offer.id);
+                                setCustomViewMode('monthly');
+                              }}
+                              className='w-full mt-3 py-2 px-3 bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 min-h-[38px]'
+                            >
+                              <Calendar className='w-3.5 h-3.5' /> ดูตารางแจกแจงค่างวดรายเดือน
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Granular Comparison Table */}
+                    <div className='bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4'>
+                      <div className='flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100'>
+                        <div>
+                          <h3 className='text-sm font-bold text-slate-900 flex items-center gap-2'>
+                            <BarChart3 className='w-4 h-4 text-indigo-600' />
+                            ตารางวิเคราะห์เปรียบเทียบเชิงลึก (Decision Matrix)
+                          </h3>
+                          <p className='text-xs text-slate-500 mt-0.5'>
+                            {customViewMode === 'annual' 
+                              ? 'สรุปดอกเบี้ยและยอดผ่อนแยกรายปี (บ้าน vs MRTA)' 
+                              : `ตารางแจกแจงรายงวด (Monthly Amortization Schedule) ของ ${activeAmortizationOffer?.offer.bankName || ''}`
+                            }
+                          </p>
+                        </div>
+
+                        <div className='flex items-center gap-2'>
+                          <div className='inline-flex bg-slate-100 p-1 rounded-xl text-xs'>
+                            <button
+                              type='button'
+                              onClick={() => setCustomViewMode('annual')}
+                              className={`px-3 py-1.5 rounded-lg font-bold transition min-h-[36px] ${
+                                customViewMode === 'annual'
+                                  ? 'bg-white text-indigo-700 shadow-xs'
+                                  : 'text-slate-600 hover:text-slate-900'
+                              }`}
+                            >
+                              📅 สรุปรายปี (Annual)
+                            </button>
+                            <button
+                              type='button'
+                              onClick={() => setCustomViewMode('monthly')}
+                              className={`px-3 py-1.5 rounded-lg font-bold transition min-h-[36px] ${
+                                customViewMode === 'monthly'
+                                  ? 'bg-white text-indigo-700 shadow-xs'
+                                  : 'text-slate-600 hover:text-slate-900'
+                              }`}
+                            >
+                              📑 แจกแจงรายงวด (Monthly)
+                            </button>
+                          </div>
+
+                          {customViewMode === 'annual' && (
+                            <button
+                              type='button'
+                              onClick={() => setShowFullTermCustom(!showFullTermCustom)}
+                              className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition min-h-[36px] ${
+                                showFullTermCustom 
+                                  ? 'bg-indigo-50 border-indigo-300 text-indigo-700' 
+                                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                              }`}
+                            >
+                              {showFullTermCustom ? 'ย่อเหลือ 3 ปี' : 'ขยายเต็มสัญญา'}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* ANNUAL VIEW */}
+                      {customViewMode === 'annual' && (
+                        <div className='space-y-4'>
+                          {advancedCustomResults.map(res => (
+                            <div key={res.offer.id} className='border border-slate-200 rounded-2xl overflow-hidden'>
+                              <div className='bg-slate-50 px-4 py-2.5 flex items-center justify-between border-b border-slate-200'>
+                                <span className='font-bold text-xs text-slate-800 flex items-center gap-2'>
+                                  <span className='w-2.5 h-2.5 rounded-full' style={{ backgroundColor: res.offer.color }} />
+                                  {res.offer.bankName}
+                                </span>
+                                <span className='text-xs font-bold text-indigo-700'>
+                                  True Net Cost 3 ปี: {res.trueNetCost3Years.toLocaleString()} ฿
+                                </span>
+                              </div>
+                              <div className='overflow-x-auto'>
+                                <table className='w-full text-left text-xs'>
+                                  <thead className='bg-slate-100/60 text-slate-600 text-[11px]'>
+                                    <tr>
+                                      <th className='py-2 px-3 font-semibold'>ระยะเวลา</th>
+                                      <th className='py-2 px-3 font-semibold text-right'>ดอกเบี้ยบ้าน</th>
+                                      <th className='py-2 px-3 font-semibold text-right'>ดอกเบี้ย MRTA</th>
+                                      <th className='py-2 px-3 font-semibold text-right text-rose-600'>รวมดอกเบี้ย</th>
+                                      <th className='py-2 px-3 font-semibold text-right'>ผ่อนเรียกเก็บ</th>
+                                      <th className='py-2 px-3 font-semibold text-right text-emerald-600'>ยอดโปะเพิ่ม</th>
+                                      <th className='py-2 px-3 font-semibold text-right font-bold'>ยอดผ่อนรวม</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className='divide-y divide-slate-100'>
+                                    {(showFullTermCustom ? res.yearlyDetails : res.yearlyDetails.slice(0, 3)).map(yr => (
+                                      <tr key={yr.year} className='hover:bg-slate-50/50'>
+                                        <td className='py-2 px-3 font-medium text-slate-700'>ปีที่ {yr.year}</td>
+                                        <td className='py-2 px-3 text-right text-slate-600'>{Math.round(yr.homeInterest).toLocaleString()}</td>
+                                        <td className='py-2 px-3 text-right text-purple-600'>{Math.round(yr.mrtaInterest).toLocaleString()}</td>
+                                        <td className='py-2 px-3 text-right font-bold text-rose-600'>{Math.round(yr.totalInterest).toLocaleString()}</td>
+                                        <td className='py-2 px-3 text-right text-slate-600'>{Math.round(yr.totalRegularPayment).toLocaleString()}</td>
+                                        <td className='py-2 px-3 text-right text-emerald-600'>{Math.round(yr.totalPrepayment).toLocaleString()}</td>
+                                        <td className='py-2 px-3 text-right font-bold text-slate-900'>{Math.round(yr.totalPaid).toLocaleString()}</td>
+                                      </tr>
+                                    ))}
+                                    {/* 3-Year Summary Row */}
+                                    <tr className='bg-indigo-50/50 font-bold text-slate-900 border-t-2 border-indigo-100'>
+                                      <td className='py-2.5 px-3 text-indigo-900'>รวม 3 ปีแรก</td>
+                                      <td className='py-2.5 px-3 text-right text-slate-800'>{res.interest3YearsHome.toLocaleString()}</td>
+                                      <td className='py-2.5 px-3 text-right text-purple-700'>{res.interest3YearsMRTA.toLocaleString()}</td>
+                                      <td className='py-2.5 px-3 text-right text-rose-600 font-extrabold'>{res.interest3YearsTotal.toLocaleString()}</td>
+                                      <td className='py-2.5 px-3 text-right text-slate-800'>
+                                        {Math.round(res.yearlyDetails.slice(0, 3).reduce((s, y) => s + y.totalRegularPayment, 0)).toLocaleString()}
+                                      </td>
+                                      <td className='py-2.5 px-3 text-right text-emerald-700'>
+                                        {Math.round(res.yearlyDetails.slice(0, 3).reduce((s, y) => s + y.totalPrepayment, 0)).toLocaleString()}
+                                      </td>
+                                      <td className='py-2.5 px-3 text-right text-indigo-900 font-extrabold'>
+                                        {Math.round(res.yearlyDetails.slice(0, 3).reduce((s, y) => s + y.totalPaid, 0)).toLocaleString()}
+                                      </td>
+                                    </tr>
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* MONTHLY AMORTIZATION VIEW */}
+                      {customViewMode === 'monthly' && (
+                        <div className='space-y-4'>
+                          <div className='flex flex-wrap items-center justify-between gap-3'>
+                            <div className='flex items-center gap-2'>
+                              <span className='text-xs font-bold text-slate-700'>เลือกข้อเสนอ:</span>
+                              <select
+                                value={selectedAmortizationOfferId || customOffers[0]?.id}
+                                onChange={e => setSelectedAmortizationOfferId(e.target.value)}
+                                className='px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 min-h-[38px]'
+                              >
+                                {customOffers.map(o => (
+                                  <option key={o.id} value={o.id}>{o.bankName}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <button
+                              type='button'
+                              onClick={() => setShowFullTermCustom(!showFullTermCustom)}
+                              className='text-xs font-semibold text-indigo-600 hover:text-indigo-800'
+                            >
+                              {showFullTermCustom ? 'แสดงเฉพาะ 36 งวดแรก (3 ปี)' : 'แสดงครบทุกงวดตลอดสัญญา'}
+                            </button>
+                          </div>
+
+                          {activeAmortizationOffer ? (
+                            <div className='overflow-x-auto max-h-[500px] border border-slate-200 rounded-2xl'>
+                              <table className='w-full text-left text-xs'>
+                                <thead className='bg-slate-100 text-slate-600 text-[11px] sticky top-0 z-10 shadow-xs'>
+                                  <tr>
+                                    <th className='py-2.5 px-2.5'>งวด</th>
+                                    <th className='py-2.5 px-2.5 text-right'>ผ่อนเรียกเก็บ</th>
+                                    <th className='py-2.5 px-2.5 text-right text-emerald-600'>โปะเพิ่ม</th>
+                                    <th className='py-2.5 px-2.5 text-right font-bold'>รวมจ่าย</th>
+                                    <th className='py-2.5 px-2.5 text-right text-rose-500'>ดอกเบี้ยบ้าน</th>
+                                    <th className='py-2.5 px-2.5 text-right text-purple-600'>ดอก MRTA</th>
+                                    <th className='py-2.5 px-2.5 text-right text-blue-600'>ตัดต้นบ้าน</th>
+                                    <th className='py-2.5 px-2.5 text-right text-purple-700'>ตัดต้น MRTA</th>
+                                    <th className='py-2.5 px-2.5 text-right font-bold text-slate-900'>หนี้คงเหลือรวม</th>
+                                  </tr>
+                                </thead>
+                                <tbody className='divide-y divide-slate-100'>
+                                  {(showFullTermCustom ? activeAmortizationOffer.monthlySchedule : activeAmortizationOffer.monthlySchedule.slice(0, 36)).map(m => (
+                                    <tr key={m.month} className='hover:bg-slate-50/60'>
+                                      <td className='py-2 px-2.5 font-medium text-slate-700'>
+                                        งวด {m.month} <span className='text-[10px] text-slate-400'>(ปี {m.year})</span>
+                                      </td>
+                                      <td className='py-2 px-2.5 text-right text-slate-600'>{Math.round(m.regularPayment).toLocaleString()}</td>
+                                      <td className='py-2 px-2.5 text-right text-emerald-600 font-semibold'>{Math.round(m.prepayment).toLocaleString()}</td>
+                                      <td className='py-2 px-2.5 text-right font-bold text-slate-900'>{Math.round(m.totalPayment).toLocaleString()}</td>
+                                      <td className='py-2 px-2.5 text-right text-rose-500'>{Math.round(m.homeInterest).toLocaleString()}</td>
+                                      <td className='py-2 px-2.5 text-right text-purple-600'>{Math.round(m.mrtaInterest).toLocaleString()}</td>
+                                      <td className='py-2 px-2.5 text-right text-blue-600'>{Math.round(m.homePrincipal).toLocaleString()}</td>
+                                      <td className='py-2 px-2.5 text-right text-purple-700'>{Math.round(m.mrtaPrincipal).toLocaleString()}</td>
+                                      <td className='py-2 px-2.5 text-right font-bold text-slate-900'>{Math.round(m.balanceTotal).toLocaleString()}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          ) : null}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* TAB CONTENT: ธนาคารทั่วไป (STANDARD BANKS) */}
+            {resultsTab === 'standard' && (
+              <div className='space-y-6'>
+                {/* Best Value Highlight */}
+                {calculationResults.find(r => r.isBestPick) && (
+                  <div className='bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-2xl p-6 shadow-md'>
+                    <div className='inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/20 text-xs font-bold mb-2'>
+                      <CheckCircle2 className='w-3.5 h-3.5' /> ต้นทุนรวมต่ำที่สุด (Best Pick)
+                    </div>
+                    <h3 className='text-xl font-bold'>
+                      {calculationResults.find(r => r.isBestPick)?.bankName}
+                    </h3>
+                    <p className='text-xs text-emerald-100 mb-4'>
+                      {calculationResults.find(r => r.isBestPick)?.programName}
+                    </p>
+                    <div className='grid grid-cols-3 gap-4 pt-3 border-t border-emerald-500/50'>
+                      <div>
+                        <div className='text-[11px] text-emerald-200'>ผ่อนเฉลี่ย 3 ปีแรก</div>
+                        <div className='text-lg font-bold'>
+                          {calculationResults.find(r => r.isBestPick)?.monthlyPaymentFirst3YearsAvg.toLocaleString()} <span className='text-xs font-normal'>บ./ด.</span>
+                        </div>
+                      </div>
+                      <div>
+                        <div className='text-[11px] text-emerald-200'>ดอกเบี้ยรวมตลอดสัญญา</div>
+                        <div className='text-lg font-bold'>
+                          {((calculationResults.find(r => r.isBestPick)?.totalInterestPaid || 0) / 1000000).toFixed(2)} ล้าน
+                        </div>
+                      </div>
+                      <div>
+                        <div className='text-[11px] text-emerald-200'>ต้นทุนรวม (True Cost)</div>
+                        <div className='text-lg font-bold text-amber-300'>
+                          {((calculationResults.find(r => r.isBestPick)?.grandTotalCost || 0) / 1000000).toFixed(2)} ล้าน
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Comparison Cards Grid */}
+                <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                  {calculationResults.map(res => {
+                    const bank = banks.find(b => b.id === res.bankId) || banks[0];
+                    return (
+                      <div 
+                        key={res.programId} 
+                        className={`bg-white rounded-2xl p-5 border flex flex-col justify-between ${res.isBestPick ? 'border-emerald-500 ring-2 ring-emerald-500/20 shadow-sm' : 'border-slate-200'}`}
+                      >
+                        <div>
+                          <div className='flex justify-between items-start mb-2'>
+                            <div>
+                              <h4 className='text-sm font-bold text-slate-900'>{res.bankName}</h4>
+                              <p className='text-[11px] text-slate-500 line-clamp-1'>{res.programName}</p>
+                            </div>
+                            {res.isBestPick && (
+                              <span className='px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold'>
+                                ดีที่สุด
+                              </span>
+                            )}
+                          </div>
+
+                          <div className='space-y-1.5 text-xs py-2 border-y border-slate-100 my-2'>
+                            <div className='flex justify-between'>
+                              <span className='text-slate-500'>ดอกเบี้ยเฉลี่ย 3 ปีแรก</span>
+                              <span className='font-bold text-blue-600'>{res.effectiveInterestRate}%</span>
+                            </div>
+                            <div className='flex justify-between'>
+                              <span className='text-slate-500'>ผ่อนเฉลี่ยต่อเดือน (3 ปีแรก)</span>
+                              <span className='font-bold text-slate-900'>{res.monthlyPaymentFirst3YearsAvg.toLocaleString()} ฿</span>
+                            </div>
+                            <div className='flex justify-between'>
+                              <span className='text-slate-500'>ดอกเบี้ยรวมตลอดสัญญา</span>
+                              <span className='font-semibold text-rose-600'>{res.totalInterestPaid.toLocaleString()} ฿</span>
+                            </div>
+                            <div className='flex justify-between'>
+                              <span className='text-slate-500'>ประกัน MRTA</span>
+                              <span className='font-semibold'>{res.mrtaPremium.toLocaleString()} ฿</span>
+                            </div>
+                            <div className='flex justify-between'>
+                              <span className='text-slate-500'>ค่าธรรมเนียมทั้งหมด</span>
+                              <span className='font-semibold'>{res.totalFees.toLocaleString()} ฿</span>
+                            </div>
+                          </div>
+
+                          <div className='flex items-baseline justify-between pt-1'>
+                            <span className='text-xs text-slate-500'>ต้นทุนรวมสุทธิ:</span>
+                            <span className='text-base font-extrabold text-slate-900'>
+                              {res.grandTotalCost.toLocaleString()} <span className='text-xs font-normal'>฿</span>
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Duplicate to Custom Offer Button */}
+                        <button
+                          type='button'
+                          onClick={() => handleDuplicateBankToCustom(bank)}
+                          className='w-full mt-3 py-2 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 min-h-[38px]'
+                        >
+                          <Sparkles className='w-3.5 h-3.5' /> คัดลอกไปปรับแต่งในข้อเสนอของฉัน
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
-                <h3 className='text-xl font-bold'>
-                  {calculationResults.find(r => r.isBestPick)?.bankName}
-                </h3>
-                <p className='text-xs text-emerald-100 mb-4'>
-                  {calculationResults.find(r => r.isBestPick)?.programName}
-                </p>
-                <div className='grid grid-cols-3 gap-4 pt-3 border-t border-emerald-500/50'>
-                  <div>
-                    <div className='text-[11px] text-emerald-200'>ผ่อนเฉลี่ย 3 ปีแรก</div>
-                    <div className='text-lg font-bold'>
-                      {calculationResults.find(r => r.isBestPick)?.monthlyPaymentFirst3YearsAvg.toLocaleString()} <span className='text-xs font-normal'>บ./ด.</span>
-                    </div>
+
+                {/* Comparison Charts */}
+                <div className='bg-white rounded-2xl p-6 border border-slate-200'>
+                  <h3 className='text-sm font-bold text-slate-900 mb-4 flex items-center gap-2'>
+                    <BarChart3 className='w-4 h-4 text-blue-600' />
+                    เปรียบเทียบสัดส่วนต้นทุน (เงินต้น vs ดอกเบี้ย vs MRTA vs ค่าธรรมเนียม)
+                  </h3>
+                  <div className='h-64 w-full'>
+                    <ResponsiveContainer width='100%' height='100%'>
+                      <BarChart data={barChartData}>
+                        <XAxis dataKey='name' tick={{ fontSize: 11 }} />
+                        <YAxis tickFormatter={v => `${(v / 1000000).toFixed(1)}M`} tick={{ fontSize: 11 }} />
+                        <RechartsTooltip formatter={(val: any) => [`${Number(val).toLocaleString()} บาท`]} />
+                        <Legend wrapperStyle={{ fontSize: '11px' }} />
+                        <Bar dataKey='เงินต้น' stackId='a' fill='#3b82f6' />
+                        <Bar dataKey='ดอกเบี้ยรวม' stackId='a' fill='#f43f5e' />
+                        <Bar dataKey='ประกัน MRTA' stackId='a' fill='#10b981' />
+                        <Bar dataKey='ค่าธรรมเนียม' stackId='a' fill='#f59e0b' />
+                      </BarChart>
+                    </ResponsiveContainer>
                   </div>
-                  <div>
-                    <div className='text-[11px] text-emerald-200'>ดอกเบี้ยรวมตลอดสัญญา</div>
-                    <div className='text-lg font-bold'>
-                      {((calculationResults.find(r => r.isBestPick)?.totalInterestPaid || 0) / 1000000).toFixed(2)} ล้าน
-                    </div>
+                </div>
+
+                {/* Amortization Table */}
+                <div className='bg-white rounded-2xl p-6 border border-slate-200'>
+                  <div className='flex items-center justify-between mb-3'>
+                    <h3 className='text-sm font-bold text-slate-900 flex items-center gap-2'>
+                      <Calendar className='w-4 h-4 text-indigo-600' />
+                      ตารางผ่อนชำระตัวอย่าง (12 งวดแรก)
+                    </h3>
+                    <span className='text-xs text-slate-500'>
+                      {calculationResults[0]?.bankName}
+                    </span>
                   </div>
-                  <div>
-                    <div className='text-[11px] text-emerald-200'>ต้นทุนรวม (True Cost)</div>
-                    <div className='text-lg font-bold text-amber-300'>
-                      {((calculationResults.find(r => r.isBestPick)?.grandTotalCost || 0) / 1000000).toFixed(2)} ล้าน
-                    </div>
+                  <div className='overflow-x-auto'>
+                    <table className='w-full text-left text-xs'>
+                      <thead className='bg-slate-50 text-slate-500 text-[11px]'>
+                        <tr>
+                          <th className='py-2 px-3'>งวด</th>
+                          <th className='py-2 px-3'>ยอดผ่อน</th>
+                          <th className='py-2 px-3'>เงินต้น</th>
+                          <th className='py-2 px-3'>ดอกเบี้ย</th>
+                          <th className='py-2 px-3'>ยอดคงเหลือ</th>
+                        </tr>
+                      </thead>
+                      <tbody className='divide-y divide-slate-100'>
+                        {calculationResults[0]?.schedule.slice(0, 12).map(row => (
+                          <tr key={row.month}>
+                            <td className='py-2 px-3 text-slate-700'>เดือน {row.month}</td>
+                            <td className='py-2 px-3 font-bold text-slate-900'>{row.payment.toLocaleString()}</td>
+                            <td className='py-2 px-3 text-emerald-600'>{row.principal.toLocaleString()}</td>
+                            <td className='py-2 px-3 text-rose-500'>{row.interest.toLocaleString()}</td>
+                            <td className='py-2 px-3 text-slate-600'>{row.balance.toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               </div>
             )}
-
-            {/* Comparison Cards Grid */}
-            <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-              {calculationResults.map(res => (
-                <div 
-                  key={res.programId} 
-                  className={`bg-white rounded-2xl p-5 border ${res.isBestPick ? 'border-emerald-500 ring-2 ring-emerald-500/20 shadow-sm' : 'border-slate-200'}`}
-                >
-                  <div className='flex justify-between items-start mb-2'>
-                    <div>
-                      <h4 className='text-sm font-bold text-slate-900'>{res.bankName}</h4>
-                      <p className='text-[11px] text-slate-500 line-clamp-1'>{res.programName}</p>
-                    </div>
-                    {res.isBestPick && (
-                      <span className='px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold'>
-                        ดีที่สุด
-                      </span>
-                    )}
-                  </div>
-
-                  <div className='space-y-1.5 text-xs py-2 border-y border-slate-100 my-2'>
-                    <div className='flex justify-between'>
-                      <span className='text-slate-500'>ดอกเบี้ยเฉลี่ย 3 ปีแรก</span>
-                      <span className='font-bold text-blue-600'>{res.effectiveInterestRate}%</span>
-                    </div>
-                    <div className='flex justify-between'>
-                      <span className='text-slate-500'>ผ่อนเฉลี่ยต่อเดือน (3 ปีแรก)</span>
-                      <span className='font-bold text-slate-900'>{res.monthlyPaymentFirst3YearsAvg.toLocaleString()} ฿</span>
-                    </div>
-                    <div className='flex justify-between'>
-                      <span className='text-slate-500'>ดอกเบี้ยรวมตลอดสัญญา</span>
-                      <span className='font-semibold text-rose-600'>{res.totalInterestPaid.toLocaleString()} ฿</span>
-                    </div>
-                    <div className='flex justify-between'>
-                      <span className='text-slate-500'>ประกัน MRTA</span>
-                      <span className='font-semibold'>{res.mrtaPremium.toLocaleString()} ฿</span>
-                    </div>
-                    <div className='flex justify-between'>
-                      <span className='text-slate-500'>ค่าธรรมเนียมทั้งหมด</span>
-                      <span className='font-semibold'>{res.totalFees.toLocaleString()} ฿</span>
-                    </div>
-                  </div>
-
-                  <div className='flex items-baseline justify-between pt-1'>
-                    <span className='text-xs text-slate-500'>ต้นทุนรวมสุทธิ:</span>
-                    <span className='text-base font-extrabold text-slate-900'>
-                      {res.grandTotalCost.toLocaleString()} <span className='text-xs font-normal'>฿</span>
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Comparison Charts */}
-            <div className='bg-white rounded-2xl p-6 border border-slate-200'>
-              <h3 className='text-sm font-bold text-slate-900 mb-4 flex items-center gap-2'>
-                <BarChart3 className='w-4 h-4 text-blue-600' />
-                เปรียบเทียบสัดส่วนต้นทุน (เงินต้น vs ดอกเบี้ย vs MRTA vs ค่าธรรมเนียม)
-              </h3>
-              <div className='h-64 w-full'>
-                <ResponsiveContainer width='100%' height='100%'>
-                  <BarChart data={barChartData}>
-                    <XAxis dataKey='name' tick={{ fontSize: 11 }} />
-                    <YAxis tickFormatter={v => `${(v / 1000000).toFixed(1)}M`} tick={{ fontSize: 11 }} />
-                    <RechartsTooltip formatter={(val: any) => [`${Number(val).toLocaleString()} บาท`]} />
-                    <Legend wrapperStyle={{ fontSize: '11px' }} />
-                    <Bar dataKey='เงินต้น' stackId='a' fill='#3b82f6' />
-                    <Bar dataKey='ดอกเบี้ยรวม' stackId='a' fill='#f43f5e' />
-                    <Bar dataKey='ประกัน MRTA' stackId='a' fill='#10b981' />
-                    <Bar dataKey='ค่าธรรมเนียม' stackId='a' fill='#f59e0b' />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* Amortization Table */}
-            <div className='bg-white rounded-2xl p-6 border border-slate-200'>
-              <div className='flex items-center justify-between mb-3'>
-                <h3 className='text-sm font-bold text-slate-900 flex items-center gap-2'>
-                  <Calendar className='w-4 h-4 text-indigo-600' />
-                  ตารางผ่อนชำระตัวอย่าง (12 งวดแรก)
-                </h3>
-                <span className='text-xs text-slate-500'>
-                  {calculationResults[0]?.bankName}
-                </span>
-              </div>
-              <div className='overflow-x-auto'>
-                <table className='w-full text-left text-xs'>
-                  <thead className='bg-slate-50 text-slate-500 text-[11px]'>
-                    <tr>
-                      <th className='py-2 px-3'>งวด</th>
-                      <th className='py-2 px-3'>ยอดผ่อน</th>
-                      <th className='py-2 px-3'>เงินต้น</th>
-                      <th className='py-2 px-3'>ดอกเบี้ย</th>
-                      <th className='py-2 px-3'>ยอดคงเหลือ</th>
-                    </tr>
-                  </thead>
-                  <tbody className='divide-y divide-slate-100'>
-                    {calculationResults[0]?.schedule.slice(0, 12).map(row => (
-                      <tr key={row.month}>
-                        <td className='py-2 px-3 text-slate-700'>เดือน {row.month}</td>
-                        <td className='py-2 px-3 font-bold text-slate-900'>{row.payment.toLocaleString()}</td>
-                        <td className='py-2 px-3 text-emerald-600'>{row.principal.toLocaleString()}</td>
-                        <td className='py-2 px-3 text-rose-500'>{row.interest.toLocaleString()}</td>
-                        <td className='py-2 px-3 text-slate-600'>{row.balance.toLocaleString()}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
 
           </div>
 
@@ -1116,179 +1984,24 @@ export default function App() {
         </div>
       )}
 
-      {/* ================= MODAL: กรอกข้อเสนอดอกเบี้ยเอง ================= */}
-      {isModalOpen && (
-        <div className='fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50'>
-          <div className='bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto'>
-            <div className='flex items-center justify-between pb-3 border-b border-slate-100'>
-              <h3 className='text-base font-bold text-slate-900 flex items-center gap-2'>
-                <Sparkles className='w-4 h-4 text-indigo-600' />
-                เพิ่มข้อเสนอดอกเบี้ยเฉพาะบุคคล
-              </h3>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className='p-1.5 text-slate-400 hover:text-slate-600 rounded-lg'
-              >
-                <X className='w-5 h-5' />
-              </button>
-            </div>
+      {/* ================= MODAL: กรอกข้อเสนอขั้นสูง & ข้อเสนอเฉพาะบุคคล ================= */}
+      <AdvancedOfferModal
+        isOpen={isAdvancedModalOpen}
+        onClose={() => setIsAdvancedModalOpen(false)}
+        offer={editingAdvancedOffer}
+        onSave={handleSaveAdvancedOffer}
+        propertyPrice={propertyPrice}
+        defaultLoanAmount={loanAmount}
+        defaultTermYears={loanTermYears}
+      />
 
-            <div className='space-y-4 pt-4'>
-              <div>
-                <label className='text-xs font-bold text-slate-700 block mb-1'>ชื่อธนาคาร / ข้อเสนอ</label>
-                <input
-                  type='text'
-                  placeholder='เช่น กสิกรไทย - ข้อเสนอพิเศษสาขา'
-                  value={editingOffer.bankName}
-                  onChange={e => setEditingOffer({ ...editingOffer, bankName: e.target.value })}
-                  className='w-full px-3 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl font-medium min-h-[44px]'
-                />
-              </div>
-
-              <div>
-                <label className='text-xs font-bold text-slate-700 block mb-2'>
-                  อัตราดอกเบี้ย 3 ปีแรก (% ต่อปี)
-                </label>
-                <div className='grid grid-cols-3 gap-2'>
-                  <div>
-                    <span className='text-[11px] text-slate-500 block mb-1'>ปีที่ 1</span>
-                    <input
-                      type='number'
-                      step='0.01'
-                      inputMode='decimal'
-                      value={editingOffer.rateYear1}
-                      onChange={e => setEditingOffer({ ...editingOffer, rateYear1: Number(e.target.value) })}
-                      className='w-full px-2.5 py-2 text-xs font-bold bg-slate-50 border border-slate-300 rounded-lg min-h-[44px]'
-                    />
-                  </div>
-                  <div>
-                    <span className='text-[11px] text-slate-500 block mb-1'>ปีที่ 2</span>
-                    <input
-                      type='number'
-                      step='0.01'
-                      inputMode='decimal'
-                      value={editingOffer.rateYear2}
-                      onChange={e => setEditingOffer({ ...editingOffer, rateYear2: Number(e.target.value) })}
-                      className='w-full px-2.5 py-2 text-xs font-bold bg-slate-50 border border-slate-300 rounded-lg min-h-[44px]'
-                    />
-                  </div>
-                  <div>
-                    <span className='text-[11px] text-slate-500 block mb-1'>ปีที่ 3</span>
-                    <input
-                      type='number'
-                      step='0.01'
-                      inputMode='decimal'
-                      value={editingOffer.rateYear3}
-                      onChange={e => setEditingOffer({ ...editingOffer, rateYear3: Number(e.target.value) })}
-                      className='w-full px-2.5 py-2 text-xs font-bold bg-slate-50 border border-slate-300 rounded-lg min-h-[44px]'
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className='p-3 bg-slate-50 rounded-2xl border border-slate-200'>
-                <div className='flex items-center justify-between mb-2'>
-                  <label className='text-xs font-bold text-slate-800'>ดอกเบี้ยปีที่ 4 เป็นต้นไป</label>
-                  <div className='inline-flex bg-slate-200 p-0.5 rounded-lg text-[10px]'>
-                    <button
-                      type='button'
-                      onClick={() => setEditingOffer({ ...editingOffer, rateYear4PlusType: 'floating' })}
-                      className={`px-2 py-1 rounded-md transition ${editingOffer.rateYear4PlusType === 'floating' ? 'bg-white font-bold text-indigo-700 shadow-xs' : 'text-slate-600'}`}
-                    >
-                      ลอยตัว (MRR - spread)
-                    </button>
-                    <button
-                      type='button'
-                      onClick={() => setEditingOffer({ ...editingOffer, rateYear4PlusType: 'fixed' })}
-                      className={`px-2 py-1 rounded-md transition ${editingOffer.rateYear4PlusType === 'fixed' ? 'bg-white font-bold text-indigo-700 shadow-xs' : 'text-slate-600'}`}
-                    >
-                      % คงที่
-                    </button>
-                  </div>
-                </div>
-
-                {editingOffer.rateYear4PlusType === 'fixed' ? (
-                  <div>
-                    <span className='text-[11px] text-slate-500 block mb-1'>อัตราคงที่ (% ต่อปี)</span>
-                    <input
-                      type='number'
-                      step='0.01'
-                      inputMode='decimal'
-                      value={editingOffer.rateYear4PlusFixed}
-                      onChange={e => setEditingOffer({ ...editingOffer, rateYear4PlusFixed: Number(e.target.value) })}
-                      className='w-full px-3 py-2 text-xs font-bold bg-white border border-slate-300 rounded-lg min-h-[44px]'
-                    />
-                  </div>
-                ) : (
-                  <div className='grid grid-cols-2 gap-2'>
-                    <div>
-                      <span className='text-[11px] text-slate-500 block mb-1'>ฐานอ้างอิง</span>
-                      <select
-                        value={editingOffer.rateYear4PlusBase}
-                        onChange={e => setEditingOffer({ ...editingOffer, rateYear4PlusBase: e.target.value as any })}
-                        className='w-full px-2.5 py-2 text-xs bg-white border border-slate-300 rounded-lg min-h-[44px]'
-                      >
-                        <option value='MRR'>MRR (ประมาณ 7.30%)</option>
-                        <option value='MLR'>MLR (ประมาณ 7.05%)</option>
-                        <option value='MOR'>MOR (ประมาณ 7.50%)</option>
-                      </select>
-                    </div>
-                    <div>
-                      <span className='text-[11px] text-slate-500 block mb-1'>ส่วนลด/บวก (Spread %)</span>
-                      <input
-                        type='number'
-                        step='0.05'
-                        inputMode='decimal'
-                        placeholder='เช่น -1.25'
-                        value={editingOffer.rateYear4PlusSpread}
-                        onChange={e => setEditingOffer({ ...editingOffer, rateYear4PlusSpread: Number(e.target.value) })}
-                        className='w-full px-2.5 py-2 text-xs font-bold bg-white border border-slate-300 rounded-lg min-h-[44px]'
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className='p-3 bg-emerald-50/60 rounded-2xl border border-emerald-200'>
-                <label className='text-xs font-bold text-emerald-900 block mb-1'>
-                  ส่วนลดดอกเบี้ยบ้านเมื่อทำ MRTA (% ต่อปี)
-                </label>
-                <div className='relative'>
-                  <input
-                    type='number'
-                    step='0.05'
-                    inputMode='decimal'
-                    value={editingOffer.mrtaDiscountRate}
-                    onChange={e => setEditingOffer({ ...editingOffer, mrtaDiscountRate: Number(e.target.value) })}
-                    className='w-full px-3 py-2 text-xs font-bold bg-white border border-emerald-300 rounded-lg text-emerald-900 min-h-[44px]'
-                  />
-                  <span className='absolute right-3 top-2.5 text-xs text-emerald-600 font-bold'>% ต่อปี (3 ปีแรก)</span>
-                </div>
-                <p className='text-[10px] text-emerald-700 mt-1'>
-                  หากทำ MRTA ดอกเบี้ย 3 ปีแรกจะถูกหักลดเพิ่มอีก {editingOffer.mrtaDiscountRate}% อัตโนมัติ
-                </p>
-              </div>
-
-              <div className='flex gap-2 pt-3'>
-                <button
-                  type='button'
-                  onClick={() => setIsModalOpen(false)}
-                  className='flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50 min-h-[44px]'
-                >
-                  ยกเลิก
-                </button>
-                <button
-                  type='button'
-                  onClick={handleSaveCustomOffer}
-                  className='flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md shadow-indigo-500/20 min-h-[44px]'
-                >
-                  บันทึกข้อเสนอนี้
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ================= MODAL: ใบเจรจาต่อรองดอกเบี้ยธนาคาร (Print / PDF) ================= */}
+      <NegotiationSheetModal
+        isOpen={isNegotiationModalOpen}
+        onClose={() => setIsNegotiationModalOpen(false)}
+        offers={advancedCustomResults}
+        propertyPrice={propertyPrice}
+      />
 
     </div>
   );

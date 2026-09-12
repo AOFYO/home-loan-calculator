@@ -310,3 +310,358 @@ export function calculateLoanProgram(
     schedule
   };
 }
+
+/**
+ * คำนวณข้อเสนอสินเชื่อแบบละเอียด (Advanced Custom Offer)
+ * รองรับ 2 บัญชีอิสระ (บ้าน + MRTA), ยอดผ่อนธนาคารแจ้งจริง, แผนโปะ Target Monthly,
+ * ตารางสรุป 3 ปีแรกทั้งรายปี/รายงวด, ค่าธรรมเนียมแยกผู้รับผิดชอบ และ True Net Cost
+ */
+export function calculateAdvancedCustomOffer(
+  offer: CustomBankOffer,
+  defaultPropertyPrice: number,
+  defaultLoanAmount: number,
+  defaultTermYears: number,
+  defaultBorrowerAge: number,
+  defaultFeeConfig: FeeConfig,
+  botRates?: Record<string, BotRateData>
+): import('../types/loan').AdvancedOfferCalculationResult {
+  const homePrincipal = offer.homeLoan?.loanAmount ?? defaultLoanAmount;
+  const homeTermYears = offer.homeLoan?.termYears ?? defaultTermYears;
+  const mrtaPremium = offer.mrtaLoan?.totalPremium ?? 0;
+  const mrtaFinance = offer.mrtaLoan?.financeWithLoan ?? false;
+  const mrtaPrincipal = mrtaFinance ? (offer.mrtaLoan?.loanAmount ?? mrtaPremium) : 0;
+  const mrtaTermYears = offer.mrtaLoan?.termYears ?? Math.min(20, homeTermYears);
+  const propertyPrice = offer.propertyPrice ?? defaultPropertyPrice;
+  const maxTermYears = Math.max(homeTermYears, mrtaTermYears);
+  const totalMonths = maxTermYears * 12;
+
+  const getHomeRate = (yr: number): number => {
+    const hl = offer.homeLoan;
+    if (yr === 1) return hl?.rateYear1 ?? offer.rateYear1 ?? 3.0;
+    if (yr === 2) return hl?.rateYear2 ?? offer.rateYear2 ?? 3.5;
+    if (yr === 3) return hl?.rateYear3 ?? offer.rateYear3 ?? 4.0;
+    
+    const type = hl?.rateYear4PlusType ?? offer.rateYear4PlusType;
+    if (type === 'fixed') {
+      return hl?.rateYear4PlusFixed ?? offer.rateYear4PlusFixed ?? 5.5;
+    }
+    const base = hl?.rateYear4PlusBase ?? offer.rateYear4PlusBase ?? 'MRR';
+    const spread = hl?.rateYear4PlusSpread ?? offer.rateYear4PlusSpread ?? 0;
+    let baseVal = 7.30;
+    if (botRates && base === 'MLR') baseVal = 7.05;
+    return Number((baseVal + spread).toFixed(3));
+  };
+
+  const getMRTARate = (yr: number): number => {
+    const ml = offer.mrtaLoan;
+    if (!ml) return getHomeRate(yr);
+    if (yr === 1) return ml.rateYear1 ?? getHomeRate(1);
+    if (yr === 2) return ml.rateYear2 ?? getHomeRate(2);
+    if (yr === 3) return ml.rateYear3 ?? getHomeRate(3);
+
+    if (ml.rateYear4PlusType === 'fixed') {
+      return ml.rateYear4PlusFixed ?? getHomeRate(yr);
+    }
+    const base = ml.rateYear4PlusBase ?? 'MRR';
+    const spread = ml.rateYear4PlusSpread ?? 0;
+    let baseVal = 7.30;
+    if (botRates && base === 'MLR') baseVal = 7.05;
+    return Number((baseVal + spread).toFixed(3));
+  };
+
+  // Helper สำหรับคำนวณการผ่อนชำระ
+  const runSimulation = (applyPrepayment: boolean) => {
+    let hBal = homePrincipal;
+    let mBal = mrtaPrincipal;
+    const monthlySchedule: import('../types/loan').MonthlyAmortizationRow[] = [];
+    const yearlyMap = new Map<number, import('../types/loan').YearlyInterestDetail>();
+
+    let totalMonthsToPayoff = 0;
+    let totalHomeInterest = 0;
+    let totalMrtaInterest = 0;
+    let first3YearsHomeMonthly: number[] = [];
+    let first3YearsMrtaMonthly: number[] = [];
+
+    for (let m = 1; m <= totalMonths; m++) {
+      if (hBal <= 0 && mBal <= 0) break;
+      totalMonthsToPayoff = m;
+
+      const yr = Math.ceil(m / 12);
+      const hRate = getHomeRate(yr);
+      const mRate = getMRTARate(yr);
+
+      // ดอกเบี้ยประจำเดือน
+      const hInt = hBal > 0 ? Math.round(hBal * (hRate / 100) / 12) : 0;
+      const mInt = mBal > 0 ? Math.round(mBal * (mRate / 100) / 12) : 0;
+
+      // ค่างวดที่ธนาคารแจ้ง หรือคำนวณ PMT
+      const hl = offer.homeLoan;
+      const ml = offer.mrtaLoan;
+      const hRemMonths = Math.max(1, (homeTermYears * 12) - m + 1);
+      const mRemMonths = Math.max(1, (mrtaTermYears * 12) - m + 1);
+
+      let hStatedPmt = 0;
+      if (hBal > 0) {
+        if (yr === 1 && hl?.bankInstallmentYear1) hStatedPmt = hl.bankInstallmentYear1;
+        else if (yr === 2 && hl?.bankInstallmentYear2) hStatedPmt = hl.bankInstallmentYear2;
+        else if (yr === 3 && hl?.bankInstallmentYear3) hStatedPmt = hl.bankInstallmentYear3;
+        else if (yr >= 4 && hl?.bankInstallmentYear4Plus) hStatedPmt = hl.bankInstallmentYear4Plus;
+        else hStatedPmt = calculatePMT(hBal, hRate, hRemMonths);
+      }
+
+      let mStatedPmt = 0;
+      if (mBal > 0) {
+        if (yr === 1 && ml?.bankInstallmentYear1) mStatedPmt = ml.bankInstallmentYear1;
+        else if (yr === 2 && ml?.bankInstallmentYear2) mStatedPmt = ml.bankInstallmentYear2;
+        else if (yr === 3 && ml?.bankInstallmentYear3) mStatedPmt = ml.bankInstallmentYear3;
+        else if (yr >= 4 && ml?.bankInstallmentYear4Plus) mStatedPmt = ml.bankInstallmentYear4Plus;
+        else mStatedPmt = calculatePMT(mBal, mRate, mRemMonths);
+      }
+
+      // ตรวจสอบยอดผ่อนปกติ
+      let hPrinFromPmt = Math.max(0, hStatedPmt - hInt);
+      if (hPrinFromPmt > hBal) {
+        hPrinFromPmt = hBal;
+        hStatedPmt = hPrinFromPmt + hInt;
+      }
+
+      let mPrinFromPmt = Math.max(0, mStatedPmt - mInt);
+      if (mPrinFromPmt > mBal) {
+        mPrinFromPmt = mBal;
+        mStatedPmt = mPrinFromPmt + mInt;
+      }
+
+      // แผนการโปะ
+      let extraPool = 0;
+      const prepay = offer.prepayment;
+      if (applyPrepayment && prepay && prepay.mode !== 'none') {
+        if (prepay.mode === 'target_monthly') {
+          let target = 0;
+          if (yr === 1) target = prepay.targetMonthlyYear1 || 0;
+          else if (yr === 2) target = prepay.targetMonthlyYear2 || 0;
+          else if (yr === 3) target = prepay.targetMonthlyYear3 || 0;
+          else target = prepay.targetMonthlyYear4Plus || 0;
+
+          const regularSum = hStatedPmt + mStatedPmt;
+          if (target > regularSum) {
+            extraPool = target - regularSum;
+          }
+        } else if (prepay.mode === 'fixed_extra') {
+          extraPool = prepay.fixedExtraMonthly || 0;
+        } else if (prepay.mode === 'stepped') {
+          if (yr === 1) extraPool = prepay.steppedYear1 || 0;
+          else if (yr === 2) extraPool = prepay.steppedYear2 || 0;
+          else if (yr === 3) extraPool = prepay.steppedYear3 || 0;
+          else extraPool = prepay.steppedYear4Plus || 0;
+        }
+
+        if (m % 12 === 0 && prepay.annualBonusExtra) {
+          extraPool += prepay.annualBonusExtra;
+        }
+      }
+
+      // จัดสรรเงินโปะ
+      let hExtra = 0;
+      let mExtra = 0;
+      const hRemAfterPmt = Math.max(0, hBal - hPrinFromPmt);
+      const mRemAfterPmt = Math.max(0, mBal - mPrinFromPmt);
+
+      if (extraPool > 0 && (hRemAfterPmt > 0 || mRemAfterPmt > 0)) {
+        const alloc = prepay?.allocation || 'smart_auto';
+        if (alloc === 'smart_auto') {
+          if (mRemAfterPmt > 0 && mRate >= hRate) {
+            mExtra = Math.min(mRemAfterPmt, extraPool);
+            hExtra = Math.min(hRemAfterPmt, extraPool - mExtra);
+          } else {
+            hExtra = Math.min(hRemAfterPmt, extraPool);
+            mExtra = Math.min(mRemAfterPmt, extraPool - hExtra);
+          }
+        } else if (alloc === 'proportional') {
+          const totRem = hRemAfterPmt + mRemAfterPmt;
+          if (totRem > 0) {
+            hExtra = Math.min(hRemAfterPmt, extraPool * (hRemAfterPmt / totRem));
+            mExtra = Math.min(mRemAfterPmt, extraPool - hExtra);
+          }
+        } else if (alloc === 'manual_split') {
+          const splitPct = (prepay?.manualHomeSplitPercent ?? 50) / 100;
+          hExtra = Math.min(hRemAfterPmt, extraPool * splitPct);
+          mExtra = Math.min(mRemAfterPmt, extraPool * (1 - splitPct));
+        }
+      }
+
+      // ตัดเงินต้น
+      const hPrinTotal = hPrinFromPmt + hExtra;
+      const mPrinTotal = mPrinFromPmt + mExtra;
+      hBal = Math.max(0, hBal - hPrinTotal);
+      mBal = Math.max(0, mBal - mPrinTotal);
+
+      totalHomeInterest += hInt;
+      totalMrtaInterest += mInt;
+
+      if (m <= 36) {
+        first3YearsHomeMonthly.push(hStatedPmt + hExtra);
+        if (mStatedPmt + mExtra > 0) first3YearsMrtaMonthly.push(mStatedPmt + mExtra);
+      }
+
+      // บันทึกตารางรายงวด
+      monthlySchedule.push({
+        month: m,
+        year: yr,
+        homePayment: hStatedPmt + hExtra,
+        homeInterest: hInt,
+        homePrincipal: hPrinTotal,
+        homeBalance: hBal,
+        mrtaPayment: mStatedPmt + mExtra,
+        mrtaInterest: mInt,
+        mrtaPrincipal: mPrinTotal,
+        mrtaBalance: mBal,
+        extraPrepayment: hExtra + mExtra,
+        totalPayment: hStatedPmt + mStatedPmt + hExtra + mExtra,
+        totalEndingBalance: hBal + mBal
+      });
+
+      // รวมรายปี
+      if (!yearlyMap.has(yr)) {
+        yearlyMap.set(yr, {
+          year: yr,
+          homeRate: hRate,
+          mrtaRate: mRate,
+          homePayment: 0,
+          homeInterest: 0,
+          homePrincipal: 0,
+          mrtaPayment: 0,
+          mrtaInterest: 0,
+          mrtaPrincipal: 0,
+          extraPrepayment: 0,
+          totalInterest: 0,
+          totalPayment: 0,
+          homeEndingBalance: 0,
+          mrtaEndingBalance: 0,
+          totalEndingBalance: 0
+        });
+      }
+
+      const yItem = yearlyMap.get(yr)!;
+      yItem.homePayment += (hStatedPmt + hExtra);
+      yItem.homeInterest += hInt;
+      yItem.homePrincipal += hPrinTotal;
+      yItem.mrtaPayment += (mStatedPmt + mExtra);
+      yItem.mrtaInterest += mInt;
+      yItem.mrtaPrincipal += mPrinTotal;
+      yItem.extraPrepayment += (hExtra + mExtra);
+      yItem.totalInterest += (hInt + mInt);
+      yItem.totalPayment += (hStatedPmt + mStatedPmt + hExtra + mExtra);
+      yItem.homeEndingBalance = hBal;
+      yItem.mrtaEndingBalance = mBal;
+      yItem.totalEndingBalance = hBal + mBal;
+    }
+
+    return {
+      monthlySchedule,
+      yearlyDetails: Array.from(yearlyMap.values()),
+      totalMonthsToPayoff,
+      totalHomeInterest,
+      totalMrtaInterest,
+      totalInterest: totalHomeInterest + totalMrtaInterest,
+      avg3YearsMonthly: first3YearsHomeMonthly.length > 0 
+        ? Math.round(first3YearsHomeMonthly.reduce((a, b) => a + b, 0) / first3YearsHomeMonthly.length)
+        : 0
+    };
+  };
+
+  const simWithPrepay = runSimulation(true);
+  const simBaseline = runSimulation(false);
+
+  // ดอกเบี้ย 3 ปีแรก
+  let int3YHome = 0;
+  let int3YMRTA = 0;
+  for (const yd of simWithPrepay.yearlyDetails) {
+    if (yd.year <= 3) {
+      int3YHome += yd.homeInterest;
+      int3YMRTA += yd.mrtaInterest;
+    }
+  }
+  const int3YTotal = int3YHome + int3YMRTA;
+
+  // ค่าธรรมเนียม
+  const defaultMortgage = Math.round(homePrincipal * defaultFeeConfig.mortgageFeeRate);
+  const defaultTransfer = Math.round(propertyPrice * defaultFeeConfig.transferFeeRate);
+  const defaultStamp = Math.round(homePrincipal * defaultFeeConfig.stampDutyRate);
+  const defaultAppraisal = defaultFeeConfig.appraisalFee;
+  const defaultFire = Math.round(defaultFeeConfig.fireInsurancePerYear * homeTermYears);
+
+  let borrowerFees = 0;
+  let bankFees = 0;
+
+  const f = offer.fees;
+  const processFee = (feeItem: import('../types/loan').FeeItemConfig | undefined, defaultAmt: number) => {
+    const payer = feeItem?.payer || 'borrower';
+    const amt = feeItem?.customAmount !== undefined ? feeItem.customAmount : defaultAmt;
+    if (payer === 'borrower') borrowerFees += amt;
+    else if (payer === 'bank') bankFees += amt;
+  };
+
+  processFee(f?.mortgageFee, defaultMortgage);
+  processFee(f?.transferFee, defaultTransfer);
+  processFee(f?.appraisalFee, defaultAppraisal);
+  processFee(f?.stampDuty, defaultStamp);
+  processFee(f?.fireInsurance, defaultFire);
+  if (f?.otherFees?.customAmount) {
+    if (f.otherFees.payer === 'borrower') borrowerFees += f.otherFees.customAmount;
+    else if (f.otherFees.payer === 'bank') bankFees += f.otherFees.customAmount;
+  }
+
+  // Perks
+  const totalPerks = offer.perks ? offer.perks.reduce((sum, p) => sum + (p.value || 0), 0) : 0;
+
+  // True Net Costs
+  const trueNetCost3Years = int3YTotal + (mrtaFinance ? 0 : mrtaPremium) + borrowerFees - totalPerks;
+  const trueNetCostLifetime = homePrincipal + mrtaPrincipal + simWithPrepay.totalInterest + (mrtaFinance ? 0 : mrtaPremium) + borrowerFees - totalPerks;
+
+  const downPayment = Math.max(0, propertyPrice - homePrincipal);
+  const upfrontCash = downPayment + borrowerFees + (mrtaFinance ? 0 : mrtaPremium);
+
+  // Prepayment Savings
+  const monthsSaved = Math.max(0, simBaseline.totalMonthsToPayoff - simWithPrepay.totalMonthsToPayoff);
+  const interestSaved = Math.max(0, simBaseline.totalInterest - simWithPrepay.totalInterest);
+
+  // Smart Prepayment Advice
+  let smartAdvice: string | undefined = undefined;
+  const y1Home = getHomeRate(1);
+  const y1Mrta = getMRTARate(1);
+  if (mrtaPrincipal > 0) {
+    if (y1Mrta > y1Home) {
+      smartAdvice = `💡 แนะนำ: ดอกเบี้ยวงเงิน MRTA ปีที่ 1 (${y1Mrta}%) สูงกว่าสินเชื่อบ้าน (${y1Home}%) ควรจัดสรรเงินโปะไปที่วงเงิน MRTA ก่อน (โหมด Smart Auto) เพื่อตัดหนี้ที่มีดอกเบี้ยแพงที่สุดออกก่อน`;
+    } else if (y1Home > y1Mrta) {
+      smartAdvice = `💡 แนะนำ: ดอกเบี้ยสินเชื่อบ้านปีที่ 1 (${y1Home}%) สูงกว่าวงเงิน MRTA (${y1Mrta}%) ควรจัดสรรเงินโปะตัดเงินต้นบ้านก่อน`;
+    }
+  }
+
+  return {
+    offerId: offer.id,
+    offerName: offer.bankName,
+    color: offer.color || '#6366f1',
+    yearlyDetails: simWithPrepay.yearlyDetails,
+    interest3YearsHome: int3YHome,
+    interest3YearsMRTA: int3YMRTA,
+    interest3YearsTotal: int3YTotal,
+    totalInterestLifetime: simWithPrepay.totalInterest,
+    totalPrincipalHome: homePrincipal,
+    totalPrincipalMRTA: mrtaPrincipal,
+    mrtaPremiumTotal: mrtaPremium,
+    borrowerFeesTotal: borrowerFees,
+    bankCoveredFeesTotal: bankFees,
+    totalPerksValue: totalPerks,
+    trueNetCost3Years,
+    trueNetCostLifetime,
+    upfrontCashRequired: upfrontCash,
+    monthlyPaymentAvg3Years: simWithPrepay.avg3YearsMonthly,
+    totalMonthsToPayoff: simWithPrepay.totalMonthsToPayoff,
+    monthsSavedByPrepayment: monthsSaved,
+    interestSavedByPrepayment: interestSaved,
+    monthlySchedule: simWithPrepay.monthlySchedule,
+    smartPrepaymentAdvice: smartAdvice,
+    lockInWarning: offer.lockInYears === 5
+  };
+}
+
