@@ -1556,9 +1556,16 @@ export default function App() {
                                 <span className='text-slate-500'>ดอกเบี้ย 3 ปีแรก (บ้าน + MRTA)</span>
                                 <span className='font-bold text-rose-600'>{res.interest3YearsTotal.toLocaleString()} ฿</span>
                               </div>
-                              <div className='flex justify-between'>
+                              <div className='flex justify-between items-baseline'>
                                 <span className='text-slate-500'>ผ่อนเฉลี่ย 3 ปีแรก</span>
-                                <span className='font-bold text-slate-900'>{res.monthlyPaymentFirst3YearsAvg.toLocaleString()} ฿/ด.</span>
+                                <div className='text-right'>
+                                  <span className='font-bold text-slate-900'>{res.monthlyPaymentFirst3YearsAvg.toLocaleString()} ฿/ด.</span>
+                                  {res.totalPrincipalMRTA > 0 && res.avg3YearsMrtaMonthly && res.avg3YearsMrtaMonthly > 0 ? (
+                                    <div className='text-[10px] text-slate-400 font-normal'>
+                                      (บ้าน {res.avg3YearsHomeMonthly?.toLocaleString()} + MRTA {res.avg3YearsMrtaMonthly?.toLocaleString()})
+                                    </div>
+                                  ) : null}
+                                </div>
                               </div>
                               <div className='flex justify-between'>
                                 <span className='text-slate-500'>ค่าธรรมเนียมที่ผู้กู้จ่ายเอง</span>
@@ -1738,7 +1745,14 @@ export default function App() {
                                         <td className='py-2 px-3 text-right text-slate-600'>{Math.round(yr.homeInterest).toLocaleString()}</td>
                                         <td className='py-2 px-3 text-right text-purple-600'>{Math.round(yr.mrtaInterest).toLocaleString()}</td>
                                         <td className='py-2 px-3 text-right font-bold text-rose-600'>{Math.round(yr.totalInterest).toLocaleString()}</td>
-                                        <td className='py-2 px-3 text-right text-slate-600'>{Math.round(yr.totalRegularPayment).toLocaleString()}</td>
+                                        <td className='py-2 px-3 text-right text-slate-600'>
+                                          <div>{Math.round(yr.totalRegularPayment).toLocaleString()}</div>
+                                          {yr.regularMrtaPayment && yr.regularMrtaPayment > 0 ? (
+                                            <div className='text-[10px] text-slate-400 font-normal whitespace-nowrap'>
+                                              (บ้าน {Math.round(yr.regularHomePayment || 0).toLocaleString()} + MRTA {Math.round(yr.regularMrtaPayment).toLocaleString()})
+                                            </div>
+                                          ) : null}
+                                        </td>
                                         <td className='py-2 px-3 text-right text-emerald-600'>{Math.round(yr.totalPrepayment).toLocaleString()}</td>
                                         <td className='py-2 px-3 text-right font-bold text-slate-900'>{Math.round(yr.totalPaid).toLocaleString()}</td>
                                       </tr>
@@ -1814,7 +1828,14 @@ export default function App() {
                                       <td className='py-2 px-2.5 font-medium text-slate-700'>
                                         งวด {m.month} <span className='text-[10px] text-slate-400'>(ปี {m.year})</span>
                                       </td>
-                                      <td className='py-2 px-2.5 text-right text-slate-600'>{Math.round(m.regularPayment).toLocaleString()}</td>
+                                       <td className='py-2 px-2.5 text-right text-slate-600'>
+                                         <div>{Math.round(m.regularPayment).toLocaleString()}</div>
+                                         {m.mrtaPayment > 0 && (
+                                           <div className='text-[10px] text-slate-400 font-normal whitespace-nowrap'>
+                                             (บ้าน {Math.round(m.homePayment).toLocaleString()} + MRTA {Math.round(m.mrtaPayment).toLocaleString()})
+                                           </div>
+                                         )}
+                                       </td>
                                       <td className='py-2 px-2.5 text-right text-emerald-600 font-semibold'>{Math.round(m.prepayment).toLocaleString()}</td>
                                       <td className='py-2 px-2.5 text-right font-bold text-slate-900'>{Math.round(m.totalPayment).toLocaleString()}</td>
                                       <td className='py-2 px-2.5 text-right text-rose-500'>{Math.round(m.homeInterest).toLocaleString()}</td>

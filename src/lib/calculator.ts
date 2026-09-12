@@ -381,6 +381,7 @@ export function calculateAdvancedCustomOffer(
     let totalMrtaInterest = 0;
     let first3YearsHomeMonthly: number[] = [];
     let first3YearsMrtaMonthly: number[] = [];
+    let first3YearsTotalMonthly: number[] = [];
 
     for (let m = 1; m <= totalMonths; m++) {
       if (hBal <= 0 && mBal <= 0) break;
@@ -502,6 +503,7 @@ export function calculateAdvancedCustomOffer(
       if (m <= 36) {
         first3YearsHomeMonthly.push(hStatedPmt + hExtra);
         if (mStatedPmt + mExtra > 0) first3YearsMrtaMonthly.push(mStatedPmt + mExtra);
+        first3YearsTotalMonthly.push((hStatedPmt + hExtra) + (mStatedPmt + mExtra));
       }
 
       // บันทึกตารางรายงวด
@@ -543,6 +545,8 @@ export function calculateAdvancedCustomOffer(
           mrtaEndingBalance: 0,
           totalEndingBalance: 0,
           totalRegularPayment: 0,
+          regularHomePayment: 0,
+          regularMrtaPayment: 0,
           totalPrepayment: 0,
           totalPaid: 0
         });
@@ -559,6 +563,8 @@ export function calculateAdvancedCustomOffer(
       yItem.totalInterest += (hInt + mInt);
       yItem.totalPayment += (hStatedPmt + mStatedPmt + hExtra + mExtra);
       yItem.totalRegularPayment += (hStatedPmt + mStatedPmt);
+      yItem.regularHomePayment = (yItem.regularHomePayment || 0) + hStatedPmt;
+      yItem.regularMrtaPayment = (yItem.regularMrtaPayment || 0) + mStatedPmt;
       yItem.totalPrepayment += (hExtra + mExtra);
       yItem.totalPaid += (hStatedPmt + mStatedPmt + hExtra + mExtra);
       yItem.homeEndingBalance = hBal;
@@ -573,8 +579,14 @@ export function calculateAdvancedCustomOffer(
       totalHomeInterest,
       totalMrtaInterest,
       totalInterest: totalHomeInterest + totalMrtaInterest,
-      avg3YearsMonthly: first3YearsHomeMonthly.length > 0 
+      avg3YearsMonthly: first3YearsTotalMonthly.length > 0 
+        ? Math.round(first3YearsTotalMonthly.reduce((a, b) => a + b, 0) / first3YearsTotalMonthly.length)
+        : 0,
+      avg3YearsHomeMonthly: first3YearsHomeMonthly.length > 0
         ? Math.round(first3YearsHomeMonthly.reduce((a, b) => a + b, 0) / first3YearsHomeMonthly.length)
+        : 0,
+      avg3YearsMrtaMonthly: first3YearsMrtaMonthly.length > 0
+        ? Math.round(first3YearsMrtaMonthly.reduce((a, b) => a + b, 0) / first3YearsMrtaMonthly.length)
         : 0
     };
   };
@@ -675,6 +687,8 @@ export function calculateAdvancedCustomOffer(
     upfrontCashRequired: upfrontCash,
     monthlyPaymentAvg3Years: simWithPrepay.avg3YearsMonthly,
     monthlyPaymentFirst3YearsAvg: simWithPrepay.avg3YearsMonthly,
+    avg3YearsHomeMonthly: simWithPrepay.avg3YearsHomeMonthly,
+    avg3YearsMrtaMonthly: simWithPrepay.avg3YearsMrtaMonthly,
     totalMonthsToPayoff: simWithPrepay.totalMonthsToPayoff,
     monthsSavedByPrepayment: monthsSaved,
     interestSavedByPrepayment: interestSaved,

@@ -10,9 +10,11 @@ import {
   Check, 
   Plus, 
   Trash2,
-  Copy
+  Copy,
+  Calculator
 } from 'lucide-react';
 import { CustomBankOffer, SubLoanAccount, PrepaymentPlan, CustomOfferFees, CustomOfferPerk } from '../types/loan';
+import { calculatePMT } from '../lib/calculator';
 
 interface AdvancedOfferModalProps {
   isOpen: boolean;
@@ -927,6 +929,63 @@ export const AdvancedOfferModal: React.FC<AdvancedOfferModalProps> = ({
                   </div>
                 </div>
               )}
+
+              {/* Live Total Installment Summary Helper Box */}
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 shadow-xs space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <Calculator className="w-4 h-4 text-indigo-600" />
+                    <span>💡 สรุปยอดผ่อนรวมที่ธนาคารเรียกเก็บจริง (บ้าน + MRTA)</span>
+                  </h4>
+                  <span className="text-[11px] text-slate-500 font-medium">
+                    (ค่างวดตามสัญญาที่หักเงินต้นและดอกเบี้ยจริง)
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  {[1, 2, 3, 4].map(yr => {
+                    const hPmt = yr === 1 
+                      ? (homeLoan.bankInstallmentYear1 || calculatePMT(homeLoan.loanAmount, homeLoan.rateYear1, homeLoan.termYears * 12))
+                      : yr === 2
+                      ? (homeLoan.bankInstallmentYear2 || calculatePMT(homeLoan.loanAmount, homeLoan.rateYear2, Math.max(1, (homeLoan.termYears * 12) - 12)))
+                      : yr === 3
+                      ? (homeLoan.bankInstallmentYear3 || calculatePMT(homeLoan.loanAmount, homeLoan.rateYear3, Math.max(1, (homeLoan.termYears * 12) - 24)))
+                      : (homeLoan.bankInstallmentYear4Plus || calculatePMT(homeLoan.loanAmount, homeLoan.rateYear4PlusType === 'fixed' ? homeLoan.rateYear4PlusFixed : 6.05, Math.max(1, (homeLoan.termYears * 12) - 36)));
+
+                    const mPmt = hasMRTA && mrtaFinanceWithLoan
+                      ? (yr === 1
+                        ? (mrtaLoan.bankInstallmentYear1 || calculatePMT(mrtaLoan.loanAmount, mrtaLoan.rateYear1, mrtaLoan.termYears * 12))
+                        : yr === 2
+                        ? (mrtaLoan.bankInstallmentYear2 || calculatePMT(mrtaLoan.loanAmount, mrtaLoan.rateYear2, Math.max(1, (mrtaLoan.termYears * 12) - 12)))
+                        : yr === 3
+                        ? (mrtaLoan.bankInstallmentYear3 || calculatePMT(mrtaLoan.loanAmount, mrtaLoan.rateYear3, Math.max(1, (mrtaLoan.termYears * 12) - 24)))
+                        : (mrtaLoan.bankInstallmentYear4Plus || calculatePMT(mrtaLoan.loanAmount, mrtaLoan.rateYear4PlusType === 'fixed' ? mrtaLoan.rateYear4PlusFixed : 6.30, Math.max(1, (mrtaLoan.termYears * 12) - 36))))
+                      : 0;
+
+                    const tot = Math.round(hPmt + mPmt);
+
+                    return (
+                      <div key={yr} className="p-3 bg-white rounded-lg border border-slate-200 shadow-2xs">
+                        <span className="text-[11px] font-bold text-slate-700 block">
+                          {yr === 4 ? 'ปีที่ 4+' : `ปีที่ ${yr}`}
+                        </span>
+                        <div className="text-base font-extrabold text-indigo-700 mt-0.5">
+                          ฿{tot.toLocaleString()} <span className="text-[10px] font-normal text-slate-500">/ด.</span>
+                        </div>
+                        {hasMRTA && mrtaFinanceWithLoan && mPmt > 0 && (
+                          <span className="text-[10px] text-slate-500 block mt-0.5">
+                            (บ้าน ฿{Math.round(hPmt).toLocaleString()} + MRTA ฿{Math.round(mPmt).toLocaleString()})
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="p-2.5 bg-indigo-50/70 rounded-lg border border-indigo-200/60 text-[11px] text-indigo-900 leading-relaxed">
+                  <strong>💡 คำแนะนำ:</strong> หากใบเสนอราคาจากธนาคารแจ้งยอดผ่อนรวม <strong>฿16,000 /เดือน</strong> (โดยรวมประกัน MRTA เข้าไปด้วยแล้ว) กรุณากระจายยอดผ่อนให้ทั้ง 2 ช่องรวมกันได้ 16,000 เช่น <strong>ผ่อนบ้าน ฿14,900</strong> + <strong>ผ่อน MRTA ฿1,100</strong> = รวมเรียกเก็บ ฿16,000 พอดีครับ
+                </div>
+              </div>
             </div>
           )}
 

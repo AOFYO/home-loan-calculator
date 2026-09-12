@@ -198,6 +198,8 @@ export interface YearlyInterestDetail {
   mrtaEndingBalance: number;
   totalEndingBalance: number;
   totalRegularPayment: number;
+  regularHomePayment?: number;
+  regularMrtaPayment?: number;
   totalPrepayment: number;
   totalPaid: number;
 }
@@ -243,6 +245,8 @@ export interface AdvancedOfferCalculationResult {
   upfrontCashRequired: number;   // เงินดาวน์ + ค่าธรรมเนียมผู้กู้จ่าย + เบี้ย MRTA จ่ายสด
   monthlyPaymentAvg3Years: number;
   monthlyPaymentFirst3YearsAvg: number;
+  avg3YearsHomeMonthly?: number;
+  avg3YearsMrtaMonthly?: number;
   totalMonthsToPayoff: number;
   monthsSavedByPrepayment: number;
   interestSavedByPrepayment: number;
