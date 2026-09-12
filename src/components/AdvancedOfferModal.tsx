@@ -165,8 +165,15 @@ export const AdvancedOfferModal: React.FC<AdvancedOfferModalProps> = ({
         });
       }
 
-      if (offer.mrtaLoan) {
+      if (offer.includeMRTA !== undefined) {
+        setHasMRTA(offer.includeMRTA);
+      } else if (offer.mrtaLoan) {
         setHasMRTA(true);
+      } else {
+        setHasMRTA(false);
+      }
+
+      if (offer.mrtaLoan) {
         setMrtaTotalPremium(offer.mrtaLoan.totalPremium || 120000);
         setMrtaFinanceWithLoan(offer.mrtaLoan.financeWithLoan !== false);
         setMrtaLoan({
@@ -184,8 +191,6 @@ export const AdvancedOfferModal: React.FC<AdvancedOfferModalProps> = ({
           bankInstallmentYear3: offer.mrtaLoan.bankInstallmentYear3,
           bankInstallmentYear4Plus: offer.mrtaLoan.bankInstallmentYear4Plus
         });
-      } else {
-        setHasMRTA(true);
       }
 
       if (offer.prepayment) {
@@ -254,6 +259,7 @@ export const AdvancedOfferModal: React.FC<AdvancedOfferModalProps> = ({
       rateYear4PlusSpread: homeLoan.rateYear4PlusSpread,
       mrtaDiscountRate: 0,
       isAdvanced: true,
+      includeMRTA: hasMRTA,
       propertyPrice,
       homeLoan,
       mrtaLoan: hasMRTA ? {

@@ -1393,12 +1393,16 @@ export default function App() {
 
                         <div className='grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-indigo-700/50'>
                           <div className='bg-white/5 rounded-xl p-3 border border-white/10'>
-                            <div className='text-[11px] text-indigo-200 font-medium'>ดอกเบี้ย 3 ปีแรก (บ้าน + MRTA)</div>
+                            <div className='text-[11px] text-indigo-200 font-medium'>
+                              {bestCustomPick.interest3YearsMRTA > 0 ? 'ดอกเบี้ย 3 ปีแรก (บ้าน + MRTA)' : 'ดอกเบี้ย 3 ปีแรก'}
+                            </div>
                             <div className='text-lg font-black text-white'>
                               {bestCustomPick.interest3YearsTotal.toLocaleString()} <span className='text-xs font-normal text-indigo-300'>฿</span>
                             </div>
                             <div className='text-[10px] text-indigo-300 mt-0.5'>
-                              บ้าน: {bestCustomPick.interest3YearsHome.toLocaleString()} | MRTA: {bestCustomPick.interest3YearsMRTA.toLocaleString()}
+                              {bestCustomPick.interest3YearsMRTA > 0
+                                ? `บ้าน: ${bestCustomPick.interest3YearsHome.toLocaleString()} | MRTA: ${bestCustomPick.interest3YearsMRTA.toLocaleString()}`
+                                : `วงเงินกู้บ้าน ${bestCustomPick.offer.homeLoan.loanAmount.toLocaleString()} ฿`}
                             </div>
                           </div>
 
@@ -1511,13 +1515,19 @@ export default function App() {
                                   สัญญามาตรฐาน {res.offer.lockInYears} ปี
                                 </span>
                               )}
-                              {res.offer.mrtaLoan.financeWithLoan ? (
-                                <span className='px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 text-[10px] font-medium'>
-                                  กู้เพิ่ม MRTA {(res.offer.mrtaLoan.loanAmount || 0).toLocaleString()} ฿
-                                </span>
+                              {res.offer.includeMRTA !== false && res.offer.mrtaLoan ? (
+                                res.offer.mrtaLoan.financeWithLoan ? (
+                                  <span className='px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 text-[10px] font-medium'>
+                                    กู้เพิ่ม MRTA {(res.offer.mrtaLoan.loanAmount || 0).toLocaleString()} ฿
+                                  </span>
+                                ) : (
+                                  <span className='px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-medium'>
+                                    MRTA จ่ายสด {res.offer.mrtaLoan.totalPremium.toLocaleString()} ฿
+                                  </span>
+                                )
                               ) : (
-                                <span className='px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-medium'>
-                                  MRTA จ่ายสด {res.offer.mrtaLoan.totalPremium.toLocaleString()} ฿
+                                <span className='px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] font-medium'>
+                                  ไม่มีประกัน MRTA
                                 </span>
                               )}
                             </div>
@@ -1534,7 +1544,7 @@ export default function App() {
                                   {((res.offer.homeLoan.rateYear1 + res.offer.homeLoan.rateYear2 + res.offer.homeLoan.rateYear3) / 3).toFixed(2)}%
                                 </span>
                               </div>
-                              {res.offer.mrtaLoan.financeWithLoan && (
+                              {res.offer.includeMRTA !== false && res.offer.mrtaLoan && res.offer.mrtaLoan.financeWithLoan && (
                                 <>
                                   <div className='flex justify-between items-center pt-1 border-t border-slate-200/60'>
                                     <span className='font-semibold text-slate-800'>วงเงินกู้ MRTA</span>
@@ -1553,7 +1563,9 @@ export default function App() {
                             {/* Cost details */}
                             <div className='space-y-1.5 text-xs py-2 border-y border-slate-100 mb-3'>
                               <div className='flex justify-between'>
-                                <span className='text-slate-500'>ดอกเบี้ย 3 ปีแรก (บ้าน + MRTA)</span>
+                                <span className='text-slate-500'>
+                                  {res.totalPrincipalMRTA > 0 ? 'ดอกเบี้ย 3 ปีแรก (บ้าน + MRTA)' : 'ดอกเบี้ย 3 ปีแรก'}
+                                </span>
                                 <span className='font-bold text-rose-600'>{res.interest3YearsTotal.toLocaleString()} ฿</span>
                               </div>
                               <div className='flex justify-between items-baseline'>

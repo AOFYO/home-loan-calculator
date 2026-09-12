@@ -168,6 +168,7 @@ export interface CustomBankOffer {
 
   // ฟิลด์ส่วนต่อขยายแบบละเอียด (Advanced Offer Mode)
   isAdvanced?: boolean;
+  includeMRTA?: boolean;
   propertyPrice?: number;
   homeLoan?: SubLoanAccount;
   mrtaLoan?: SubLoanAccount & {

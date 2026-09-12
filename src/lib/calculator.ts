@@ -328,12 +328,13 @@ export function calculateAdvancedCustomOffer(
 ): import('../types/loan').AdvancedOfferCalculationResult {
   const homePrincipal = offer.homeLoan?.loanAmount ?? defaultLoanAmount;
   const homeTermYears = offer.homeLoan?.termYears ?? defaultTermYears;
-  const mrtaPremium = offer.mrtaLoan?.totalPremium ?? 0;
-  const mrtaFinance = offer.mrtaLoan?.financeWithLoan ?? false;
+  const hasMRTA = offer.includeMRTA !== false && !!offer.mrtaLoan;
+  const mrtaPremium = hasMRTA ? (offer.mrtaLoan?.totalPremium ?? 0) : 0;
+  const mrtaFinance = hasMRTA ? (offer.mrtaLoan?.financeWithLoan ?? false) : false;
   const mrtaPrincipal = mrtaFinance ? (offer.mrtaLoan?.loanAmount ?? mrtaPremium) : 0;
-  const mrtaTermYears = offer.mrtaLoan?.termYears ?? Math.min(20, homeTermYears);
+  const mrtaTermYears = hasMRTA ? (offer.mrtaLoan?.termYears ?? Math.min(20, homeTermYears)) : 0;
   const propertyPrice = offer.propertyPrice ?? defaultPropertyPrice;
-  const maxTermYears = Math.max(homeTermYears, mrtaTermYears);
+  const maxTermYears = hasMRTA ? Math.max(homeTermYears, mrtaTermYears) : homeTermYears;
   const totalMonths = maxTermYears * 12;
 
   const getHomeRate = (yr: number): number => {
