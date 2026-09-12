@@ -34,16 +34,17 @@ export const NegotiationSheetModal: React.FC<NegotiationSheetModalProps> = ({
   });
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 print:p-0 print:bg-white print:static print:overflow-visible">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-5xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[95vh] print:max-h-none print:border-none print:shadow-none print:rounded-none overflow-hidden">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 print:p-0 print:bg-white print:static print:overflow-visible">
+      {/* Explicit Clean Light Card for Print & Screen */}
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl border border-slate-200 flex flex-col max-h-[95vh] print:max-h-none print:border-none print:shadow-none print:rounded-none overflow-hidden text-slate-900">
         
         {/* Header (No print close button) */}
-        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-800/60 print:bg-white print:border-b-2 print:border-slate-800 print:px-0">
+        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50 print:bg-white print:border-b-2 print:border-slate-800 print:px-0">
           <div>
-            <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white print:text-black">
+            <h2 className="text-lg sm:text-xl font-bold text-slate-900 print:text-black">
               📑 ใบเปรียบเทียบข้อเสนอสินเชื่อเพื่อการเจรจาต่อรอง (Loan Negotiation Sheet)
             </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 print:text-slate-600">
+            <p className="text-xs text-slate-600 print:text-slate-600 font-medium">
               ราคาบ้าน: ฿{propertyPrice.toLocaleString()} | วงเงินกู้: ฿{loanAmount.toLocaleString()} | ข้อมูล ณ วันที่ {new Date().toLocaleDateString('th-TH')}
             </p>
           </div>
@@ -57,7 +58,7 @@ export const NegotiationSheetModal: React.FC<NegotiationSheetModalProps> = ({
             </button>
             <button
               onClick={onClose}
-              className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              className="p-2 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100 transition"
             >
               <X className="w-5 h-5" />
             </button>
@@ -65,26 +66,26 @@ export const NegotiationSheetModal: React.FC<NegotiationSheetModalProps> = ({
         </div>
 
         {/* Content Table */}
-        <div className="flex-1 overflow-auto p-6 print:p-0 print:overflow-visible">
+        <div className="flex-1 overflow-auto p-6 bg-white print:p-0 print:overflow-visible">
           {results.length === 0 ? (
             <div className="text-center py-12 text-slate-500 text-sm">
               ไม่มีข้อเสนอให้เปรียบเทียบ กรุณาเพิ่มข้อเสนออย่างน้อย 1 รายการ
             </div>
           ) : (
-            <div className="border border-slate-200 dark:border-slate-800 print:border-slate-300 rounded-xl overflow-hidden shadow-sm">
-              <table className="w-full text-xs border-collapse">
+            <div className="border border-slate-200 print:border-slate-300 rounded-xl overflow-hidden shadow-xs">
+              <table className="w-full text-xs border-collapse bg-white">
                 <thead>
-                  <tr className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 print:bg-slate-100 print:text-black">
-                    <th className="p-3 text-left font-bold border-b border-r border-slate-200 dark:border-slate-700 w-1/4">
+                  <tr className="bg-slate-100 text-slate-800 print:bg-slate-100 print:text-black">
+                    <th className="p-3 text-left font-bold border-b border-r border-slate-200 w-1/4">
                       หัวข้อเปรียบเทียบ
                     </th>
                     {results.map(r => (
                       <th 
                         key={r.offerId} 
-                        className="p-3 text-center font-bold border-b border-r border-slate-200 dark:border-slate-700 last:border-r-0"
+                        className="p-3 text-center font-bold border-b border-r border-slate-200 last:border-r-0"
                         style={{ borderTop: `4px solid ${r.color || '#6366f1'}` }}
                       >
-                        <div className="text-sm font-bold text-slate-900 dark:text-white print:text-black">
+                        <div className="text-sm font-bold text-slate-900 print:text-black">
                           {r.offerName}
                         </div>
                         {r.offerId === bestPickId && (
@@ -97,18 +98,18 @@ export const NegotiationSheetModal: React.FC<NegotiationSheetModalProps> = ({
                   </tr>
                 </thead>
 
-                <tbody className="divide-y divide-slate-200 dark:divide-slate-800 print:divide-slate-300">
+                <tbody className="divide-y divide-slate-200 print:divide-slate-300">
                   {/* วงเงินกู้ */}
-                  <tr className="bg-slate-50/50 dark:bg-slate-800/20">
-                    <td className="p-3 font-semibold text-slate-700 dark:text-slate-300 border-r border-slate-200 dark:border-slate-700">
+                  <tr className="bg-slate-50/60">
+                    <td className="p-3 font-semibold text-slate-800 border-r border-slate-200">
                       1. วงเงินกู้ (บ้าน + MRTA)
                     </td>
                     {results.map(r => (
-                      <td key={r.offerId} className="p-3 text-center border-r border-slate-200 dark:border-slate-700 last:border-r-0">
-                        <div className="font-bold text-slate-900 dark:text-white print:text-black">
+                      <td key={r.offerId} className="p-3 text-center border-r border-slate-200 last:border-r-0">
+                        <div className="font-bold text-slate-900 print:text-black">
                           ฿{(r.totalPrincipalHome + r.totalPrincipalMRTA).toLocaleString()}
                         </div>
-                        <div className="text-[11px] text-slate-500">
+                        <div className="text-[11px] text-slate-500 font-medium">
                           (บ้าน ฿{r.totalPrincipalHome.toLocaleString()} {r.totalPrincipalMRTA > 0 && `+ MRTA ฿${r.totalPrincipalMRTA.toLocaleString()}`})
                         </div>
                       </td>
@@ -117,22 +118,22 @@ export const NegotiationSheetModal: React.FC<NegotiationSheetModalProps> = ({
 
                   {/* ดอกเบี้ยปีที่ 1 */}
                   <tr>
-                    <td className="p-3 font-medium text-slate-700 dark:text-slate-300 border-r border-slate-200 dark:border-slate-700">
+                    <td className="p-3 font-medium text-slate-800 border-r border-slate-200">
                       2. ดอกเบี้ยปีที่ 1 (บ้าน vs MRTA)
                     </td>
                     {results.map(r => {
                       const y1 = r.yearlyDetails.find(y => y.year === 1);
                       return (
-                        <td key={r.offerId} className="p-3 text-center border-r border-slate-200 dark:border-slate-700 last:border-r-0">
-                          <div className="font-semibold text-indigo-600 dark:text-indigo-400 print:text-indigo-800">
+                        <td key={r.offerId} className="p-3 text-center border-r border-slate-200 last:border-r-0">
+                          <div className="font-semibold text-indigo-700 print:text-indigo-800">
                             บ้าน: {y1?.homeRate}% | ฿{(y1?.homeInterest || 0).toLocaleString()}
                           </div>
                           {r.totalPrincipalMRTA > 0 && (
-                            <div className="text-[11px] text-emerald-600 dark:text-emerald-400 print:text-emerald-800">
+                            <div className="text-[11px] text-emerald-700 print:text-emerald-800 font-medium">
                               MRTA: {y1?.mrtaRate}% | ฿{(y1?.mrtaInterest || 0).toLocaleString()}
                             </div>
                           )}
-                          <div className="font-bold text-slate-800 dark:text-slate-200 mt-0.5">
+                          <div className="font-bold text-slate-900 mt-0.5">
                             รวมปี 1: ฿{(y1?.totalInterest || 0).toLocaleString()}
                           </div>
                         </td>
@@ -142,22 +143,22 @@ export const NegotiationSheetModal: React.FC<NegotiationSheetModalProps> = ({
 
                   {/* ดอกเบี้ยปีที่ 2 */}
                   <tr>
-                    <td className="p-3 font-medium text-slate-700 dark:text-slate-300 border-r border-slate-200 dark:border-slate-700">
+                    <td className="p-3 font-medium text-slate-800 border-r border-slate-200">
                       3. ดอกเบี้ยปีที่ 2 (บ้าน vs MRTA)
                     </td>
                     {results.map(r => {
                       const y2 = r.yearlyDetails.find(y => y.year === 2);
                       return (
-                        <td key={r.offerId} className="p-3 text-center border-r border-slate-200 dark:border-slate-700 last:border-r-0">
-                          <div className="font-semibold text-indigo-600 dark:text-indigo-400 print:text-indigo-800">
+                        <td key={r.offerId} className="p-3 text-center border-r border-slate-200 last:border-r-0">
+                          <div className="font-semibold text-indigo-700 print:text-indigo-800">
                             บ้าน: {y2?.homeRate}% | ฿{(y2?.homeInterest || 0).toLocaleString()}
                           </div>
                           {r.totalPrincipalMRTA > 0 && (
-                            <div className="text-[11px] text-emerald-600 dark:text-emerald-400 print:text-emerald-800">
+                            <div className="text-[11px] text-emerald-700 print:text-emerald-800 font-medium">
                               MRTA: {y2?.mrtaRate}% | ฿{(y2?.mrtaInterest || 0).toLocaleString()}
                             </div>
                           )}
-                          <div className="font-bold text-slate-800 dark:text-slate-200 mt-0.5">
+                          <div className="font-bold text-slate-900 mt-0.5">
                             รวมปี 2: ฿{(y2?.totalInterest || 0).toLocaleString()}
                           </div>
                         </td>
@@ -167,22 +168,22 @@ export const NegotiationSheetModal: React.FC<NegotiationSheetModalProps> = ({
 
                   {/* ดอกเบี้ยปีที่ 3 */}
                   <tr>
-                    <td className="p-3 font-medium text-slate-700 dark:text-slate-300 border-r border-slate-200 dark:border-slate-700">
+                    <td className="p-3 font-medium text-slate-800 border-r border-slate-200">
                       4. ดอกเบี้ยปีที่ 3 (บ้าน vs MRTA)
                     </td>
                     {results.map(r => {
                       const y3 = r.yearlyDetails.find(y => y.year === 3);
                       return (
-                        <td key={r.offerId} className="p-3 text-center border-r border-slate-200 dark:border-slate-700 last:border-r-0">
-                          <div className="font-semibold text-indigo-600 dark:text-indigo-400 print:text-indigo-800">
+                        <td key={r.offerId} className="p-3 text-center border-r border-slate-200 last:border-r-0">
+                          <div className="font-semibold text-indigo-700 print:text-indigo-800">
                             บ้าน: {y3?.homeRate}% | ฿{(y3?.homeInterest || 0).toLocaleString()}
                           </div>
                           {r.totalPrincipalMRTA > 0 && (
-                            <div className="text-[11px] text-emerald-600 dark:text-emerald-400 print:text-emerald-800">
+                            <div className="text-[11px] text-emerald-700 print:text-emerald-800 font-medium">
                               MRTA: {y3?.mrtaRate}% | ฿{(y3?.mrtaInterest || 0).toLocaleString()}
                             </div>
                           )}
-                          <div className="font-bold text-slate-800 dark:text-slate-200 mt-0.5">
+                          <div className="font-bold text-slate-900 mt-0.5">
                             รวมปี 3: ฿{(y3?.totalInterest || 0).toLocaleString()}
                           </div>
                         </td>
@@ -191,16 +192,16 @@ export const NegotiationSheetModal: React.FC<NegotiationSheetModalProps> = ({
                   </tr>
 
                   {/* รวมดอกเบี้ย 3 ปีแรก */}
-                  <tr className="bg-indigo-50/60 dark:bg-indigo-950/40 font-bold">
-                    <td className="p-3 text-indigo-900 dark:text-indigo-200 border-r border-slate-200 dark:border-slate-700">
+                  <tr className="bg-indigo-50/80 font-bold">
+                    <td className="p-3 text-indigo-900 border-r border-slate-200">
                       ⭐ ดอกเบี้ยรวม 3 ปีแรก
                     </td>
                     {results.map(r => (
-                      <td key={r.offerId} className="p-3 text-center border-r border-slate-200 dark:border-slate-700 last:border-r-0">
-                        <div className="text-sm text-indigo-700 dark:text-indigo-300 print:text-indigo-900">
+                      <td key={r.offerId} className="p-3 text-center border-r border-slate-200 last:border-r-0">
+                        <div className="text-sm text-indigo-800 font-bold print:text-indigo-900">
                           ฿{r.interest3YearsTotal.toLocaleString()}
                         </div>
-                        <div className="text-[10px] text-slate-500 font-normal">
+                        <div className="text-[10px] text-slate-600 font-normal">
                           (บ้าน ฿{r.interest3YearsHome.toLocaleString()} + MRTA ฿{r.interest3YearsMRTA.toLocaleString()})
                         </div>
                       </td>
@@ -209,11 +210,11 @@ export const NegotiationSheetModal: React.FC<NegotiationSheetModalProps> = ({
 
                   {/* ค่างวดผ่อนต่อเดือนเฉลี่ย 3 ปีแรก */}
                   <tr>
-                    <td className="p-3 font-medium text-slate-700 dark:text-slate-300 border-r border-slate-200 dark:border-slate-700">
+                    <td className="p-3 font-medium text-slate-800 border-r border-slate-200">
                       5. ค่างวดผ่อนเฉลี่ย (3 ปีแรก)
                     </td>
                     {results.map(r => (
-                      <td key={r.offerId} className="p-3 text-center border-r border-slate-200 dark:border-slate-700 last:border-r-0 font-semibold">
+                      <td key={r.offerId} className="p-3 text-center border-r border-slate-200 last:border-r-0 font-bold text-slate-900">
                         ฿{r.monthlyPaymentAvg3Years.toLocaleString()} /เดือน
                       </td>
                     ))}
@@ -221,12 +222,12 @@ export const NegotiationSheetModal: React.FC<NegotiationSheetModalProps> = ({
 
                   {/* โปรโมชัน: ค่าธรรมเนียมที่ธนาคารออกให้ */}
                   <tr>
-                    <td className="p-3 font-medium text-slate-700 dark:text-slate-300 border-r border-slate-200 dark:border-slate-700">
+                    <td className="p-3 font-medium text-slate-800 border-r border-slate-200">
                       6. ฟรีค่าธรรมเนียม (แบงก์ออกให้)
                     </td>
                     {results.map(r => (
-                      <td key={r.offerId} className="p-3 text-center border-r border-slate-200 dark:border-slate-700 last:border-r-0">
-                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                      <td key={r.offerId} className="p-3 text-center border-r border-slate-200 last:border-r-0">
+                        <span className="font-semibold text-emerald-700">
                           {r.bankCoveredFeesTotal > 0 ? `+฿${r.bankCoveredFeesTotal.toLocaleString()}` : '-'}
                         </span>
                       </td>
@@ -235,12 +236,12 @@ export const NegotiationSheetModal: React.FC<NegotiationSheetModalProps> = ({
 
                   {/* ของแถมและ Cashback */}
                   <tr>
-                    <td className="p-3 font-medium text-slate-700 dark:text-slate-300 border-r border-slate-200 dark:border-slate-700">
+                    <td className="p-3 font-medium text-slate-800 border-r border-slate-200">
                       7. ของแถม / เงินคืน (Cashback)
                     </td>
                     {results.map(r => (
-                      <td key={r.offerId} className="p-3 text-center border-r border-slate-200 dark:border-slate-700 last:border-r-0">
-                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                      <td key={r.offerId} className="p-3 text-center border-r border-slate-200 last:border-r-0">
+                        <span className="font-semibold text-emerald-700">
                           {r.totalPerksValue > 0 ? `+฿${r.totalPerksValue.toLocaleString()}` : '-'}
                         </span>
                       </td>
@@ -248,16 +249,16 @@ export const NegotiationSheetModal: React.FC<NegotiationSheetModalProps> = ({
                   </tr>
 
                   {/* True Net Cost 3 ปีแรก */}
-                  <tr className="bg-emerald-50 dark:bg-emerald-950/40 font-bold border-t-2 border-emerald-500">
-                    <td className="p-3 text-emerald-900 dark:text-emerald-200 border-r border-slate-200 dark:border-slate-700">
+                  <tr className="bg-emerald-50 font-bold border-t-2 border-emerald-500">
+                    <td className="p-3 text-emerald-900 border-r border-slate-200">
                       🥇 ต้นทุนสุทธิแท้จริง 3 ปีแรก (True Net Cost)
-                      <span className="block text-[10px] font-normal text-slate-500">
+                      <span className="block text-[10px] font-normal text-slate-600">
                         (ดอกเบี้ย 3 ปี + เบี้ย MRTA + ค่าธรรมเนียมผู้กู้ - ของแถม)
                       </span>
                     </td>
                     {results.map(r => (
-                      <td key={r.offerId} className="p-3 text-center border-r border-slate-200 dark:border-slate-700 last:border-r-0">
-                        <div className="text-base text-emerald-700 dark:text-emerald-300 print:text-emerald-900 font-extrabold">
+                      <td key={r.offerId} className="p-3 text-center border-r border-slate-200 last:border-r-0">
+                        <div className="text-base text-emerald-800 print:text-emerald-900 font-extrabold">
                           ฿{r.trueNetCost3Years.toLocaleString()}
                         </div>
                       </td>
@@ -266,11 +267,11 @@ export const NegotiationSheetModal: React.FC<NegotiationSheetModalProps> = ({
 
                   {/* True Net Cost ตลอดสัญญา */}
                   <tr>
-                    <td className="p-3 font-medium text-slate-700 dark:text-slate-300 border-r border-slate-200 dark:border-slate-700">
+                    <td className="p-3 font-medium text-slate-800 border-r border-slate-200">
                       🏁 ต้นทุนสุทธิตลอดสัญญา
                     </td>
                     {results.map(r => (
-                      <td key={r.offerId} className="p-3 text-center border-r border-slate-200 dark:border-slate-700 last:border-r-0 font-semibold text-slate-700 dark:text-slate-300">
+                      <td key={r.offerId} className="p-3 text-center border-r border-slate-200 last:border-r-0 font-bold text-slate-800">
                         ฿{r.trueNetCostLifetime.toLocaleString()}
                       </td>
                     ))}
@@ -278,31 +279,31 @@ export const NegotiationSheetModal: React.FC<NegotiationSheetModalProps> = ({
 
                   {/* เงินสดวันโอน */}
                   <tr>
-                    <td className="p-3 font-medium text-slate-700 dark:text-slate-300 border-r border-slate-200 dark:border-slate-700">
+                    <td className="p-3 font-medium text-slate-800 border-r border-slate-200">
                       8. เงินสดที่ต้องเตรียมวันโอน
                     </td>
                     {results.map(r => (
-                      <td key={r.offerId} className="p-3 text-center border-r border-slate-200 dark:border-slate-700 last:border-r-0 text-slate-700 dark:text-slate-300">
+                      <td key={r.offerId} className="p-3 text-center border-r border-slate-200 last:border-r-0 font-semibold text-slate-800">
                         ฿{r.upfrontCashRequired.toLocaleString()}
                       </td>
                     ))}
                   </tr>
 
                   {/* เงื่อนไขสัญญา */}
-                  <tr className="bg-slate-50/50 dark:bg-slate-800/20">
-                    <td className="p-3 font-medium text-slate-700 dark:text-slate-300 border-r border-slate-200 dark:border-slate-700">
+                  <tr className="bg-slate-50/60">
+                    <td className="p-3 font-medium text-slate-800 border-r border-slate-200">
                       9. เงื่อนไขสัญญาห้ามรีไฟแนนซ์
                     </td>
                     {results.map(r => (
-                      <td key={r.offerId} className="p-3 text-center border-r border-slate-200 dark:border-slate-700 last:border-r-0">
+                      <td key={r.offerId} className="p-3 text-center border-r border-slate-200 last:border-r-0">
                         {r.lockInWarning ? (
-                          <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400 font-bold">
+                          <span className="inline-flex items-center gap-1 text-amber-800 font-bold">
                             <AlertTriangle className="w-3.5 h-3.5" />
                             <span>ห้ามรีไฟแนนซ์ 5 ปี</span>
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-slate-600 dark:text-slate-400">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                          <span className="inline-flex items-center gap-1 text-slate-700">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                             <span>3 ปีปกติ</span>
                           </span>
                         )}
@@ -315,7 +316,7 @@ export const NegotiationSheetModal: React.FC<NegotiationSheetModalProps> = ({
           )}
 
           {/* Print Footer Notice */}
-          <div className="mt-6 text-[11px] text-slate-500 border-t border-slate-200 pt-4 print:block">
+          <div className="mt-6 text-[11px] text-slate-600 border-t border-slate-200 pt-4 print:block">
             * เอกสารนี้จัดทำขึ้นโดยระบบจำลองทางการเงิน HomeLoan Pro TH เพื่อใช้เป็นข้อมูลเปรียบเทียบข้อเสนอสินเชื่อและประกอบการเจรจาต่อรอง อัตราดอกเบี้ยและเงื่อนไขสัญญาขั้นสุดท้ายขึ้นอยู่กับการอนุมัติของแต่ละสถาบันการเงิน
           </div>
         </div>
