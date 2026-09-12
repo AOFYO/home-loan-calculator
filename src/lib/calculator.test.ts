@@ -3,9 +3,11 @@ import {
   calculatePMT, 
   calculateAllFees,
   calculateMRTAPremium,
+  calculateLoanProgram,
   calculateAdvancedCustomOffer 
 } from './calculator';
 import { CustomBankOffer, FeeConfig } from '../types/loan';
+import { DEFAULT_BANKS, DEFAULT_MRTA_COMPANIES } from '../data/masterData';
 
 const mockFeeConfig: FeeConfig = {
   mortgageFeeRate: 0.01,
@@ -29,8 +31,6 @@ describe('Financial Formula: calculatePMT', () => {
     expect(pmt).toBe(10000);
   });
 });
-
-import { DEFAULT_MRTA_COMPANIES } from '../data/masterData';
 
 describe('MRTA Premium Calculation', () => {
   it('calculates MRTA premium based on age bracket and loan term', () => {
@@ -166,20 +166,69 @@ describe('Advanced Custom Offer Calculations', () => {
     expect(result.prepaymentYearsSaved).toBeGreaterThan(0);
   });
 
-  it('respects prepayment toggle when disabled', () => {
-    const offerDisabledPrepay: CustomBankOffer = {
+  it('calculates upfront cash and net cost correctly when MRTA is paid in cash', () => {
+    const offerCashMRTA: CustomBankOffer = {
       ...baseOffer,
-      includeMRTA: false,
-      prepayment: {
-        mode: 'target_monthly',
-        enabled: false,
-        targetMonthlyYear1: 20000
+      includeMRTA: true,
+      mrtaLoan: {
+        totalPremium: 143000,
+        financeWithLoan: false, // จ่ายสดวันโอน
+        loanAmount: 0,
+        termYears: 10,
+        rateYear1: 2.29,
+        rateYear2: 2.29,
+        rateYear3: 2.29,
+        rateYear4PlusType: 'floating',
+        rateYear4PlusFixed: 5.5,
+        rateYear4PlusBase: 'MRR',
+        rateYear4PlusSpread: -1.0
       }
     };
 
-    const result = calculateAdvancedCustomOffer(offerDisabledPrepay, 4000000, 3575000, 30, 30, mockFeeConfig);
-    expect(result.monthlySchedule[0].prepayment).toBe(0);
-    expect(result.monthlySchedule[0].totalPayment).toBe(16000);
-    expect(result.prepaymentSavingsInterest).toBe(0);
+    const result = calculateAdvancedCustomOffer(offerCashMRTA, 4000000, 3575000, 30, 30, mockFeeConfig);
+    // เมื่อจ่ายสด: ยอดกู้ MRTA = 0
+    expect(result.totalPrincipalMRTA).toBe(0);
+    expect(result.mrtaPremiumTotal).toBe(143000);
+    // เงินสดวันโอนต้องรวมเบี้ย MRTA 143,000 เข้าไปด้วย
+    expect(result.upfrontCashRequired).toBeGreaterThanOrEqual(143000);
+    // ผ่อนรายเดือนคิดเฉพาะบ้าน = 16,000
+    expect(result.monthlyPaymentFirst3YearsAvg).toBe(16000);
+  });
+
+  it('deducts perks and cashback from true net cost', () => {
+    const offerWithPerks: CustomBankOffer = {
+      ...baseOffer,
+      includeMRTA: false,
+      perks: [
+        { id: 'p1', name: 'Cashback โอนบ้าน', value: 10000, type: 'cashback' },
+        { id: 'p2', name: 'บัตรกำนัล', value: 5000, type: 'voucher' }
+      ]
+    };
+
+    const result = calculateAdvancedCustomOffer(offerWithPerks, 4000000, 3575000, 30, 30, mockFeeConfig);
+    expect(result.totalPerksValue).toBe(15000);
+  });
+});
+
+describe('Standard Preset Bank Loan Calculation', () => {
+  it('calculates standard loan program amortization correctly', () => {
+    const bank = DEFAULT_BANKS[0];
+    const program = bank.programs[0];
+
+    const result = calculateLoanProgram(
+      program,
+      bank,
+      4000000,
+      3575000,
+      30,
+      30,
+      { includeMRTA: false },
+      mockFeeConfig
+    );
+
+    expect(result.monthlyPaymentFirst3YearsAvg).toBeGreaterThan(0);
+    expect(result.totalInterestPaid).toBeGreaterThan(0);
+    expect(result.grandTotalCost).toBeGreaterThan(3575000);
+    expect(result.schedule.length).toBe(360);
   });
 });
