@@ -315,6 +315,7 @@ export default function App() {
         rateYear4PlusSpread: -1.00
       },
       prepayment: {
+        enabled: true,
         mode: 'target_monthly',
         targetMonthlyYear1: 16000,
         targetMonthlyYear2: 18000,
@@ -355,6 +356,21 @@ export default function App() {
   const handleDeleteCustomOffer = (offerId: string) => {
     setCustomOffers(customOffers.filter(o => o.id !== offerId));
     setSelectedBankIds(selectedBankIds.filter(id => id !== offerId));
+  };
+
+  const handleTogglePrepayment = (offerId: string) => {
+    setCustomOffers(prev => prev.map(o => {
+      if (o.id === offerId && o.prepayment) {
+        return {
+          ...o,
+          prepayment: {
+            ...o.prepayment,
+            enabled: o.prepayment.enabled === false ? true : false
+          }
+        };
+      }
+      return o;
+    }));
   };
 
   const handleSeedSampleOffers = () => {
@@ -1392,7 +1408,7 @@ export default function App() {
                               {bestCustomPick.monthlyPaymentFirst3YearsAvg.toLocaleString()} <span className='text-xs font-normal text-indigo-300'>฿/ด.</span>
                             </div>
                             <div className='text-[10px] text-indigo-300 mt-0.5'>
-                              {bestCustomPick.offer.prepayment.mode === 'target_monthly' ? 'รวมยอดตั้งใจผ่อนโปะแล้ว' : 'ผ่อนตามเรียกเก็บ'}
+                              {bestCustomPick.offer.prepayment && bestCustomPick.offer.prepayment.enabled !== false && bestCustomPick.offer.prepayment.mode === 'target_monthly' ? 'รวมยอดตั้งใจผ่อนโปะแล้ว' : 'ผ่อนตามเรียกเก็บ'}
                             </div>
                           </div>
 
@@ -1556,11 +1572,44 @@ export default function App() {
                               )}
                             </div>
 
-                            {/* Prepayment benefits if any */}
-                            {res.prepaymentSavingsInterest > 0 && (
-                              <div className='mb-3 p-2 bg-emerald-50 rounded-lg text-[11px] text-emerald-800 flex items-center justify-between'>
-                                <span>💰 ผลจากการผ่อนโปะ:</span>
-                                <span className='font-bold'>ประหยัดดอก {res.prepaymentSavingsInterest.toLocaleString()} ฿ (ลดเวลา {res.prepaymentYearsSaved} ปี)</span>
+                            {/* Prepayment benefits or disabled status */}
+                            {res.offer.prepayment && res.offer.prepayment.mode !== 'none' && (
+                              <div className='mb-3'>
+                                {res.offer.prepayment.enabled !== false ? (
+                                  <div className='p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-[11px] text-emerald-800 flex items-center justify-between gap-2 shadow-2xs'>
+                                    <div className='flex items-center gap-1.5'>
+                                      <span>💰 ผลการผ่อนโปะ:</span>
+                                      <span className='font-bold'>
+                                        {res.prepaymentSavingsInterest > 0 
+                                          ? `ประหยัด ${res.prepaymentSavingsInterest.toLocaleString()} ฿ (ลด ${res.prepaymentYearsSaved} ปี)`
+                                          : 'เปิดคำนวณเงินโปะ'}
+                                      </span>
+                                    </div>
+                                    <button
+                                      type='button'
+                                      onClick={() => handleTogglePrepayment(res.offer.id)}
+                                      title='กดเพื่อปิดแผนโปะชั่วคราว (คำนวณตามสัญญาปกติ)'
+                                      className='px-2 py-0.5 rounded-md text-[10px] font-bold bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-300 transition whitespace-nowrap cursor-pointer shadow-2xs'
+                                    >
+                                      ปิดโปะ
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className='p-2.5 bg-slate-100 border border-slate-200 rounded-xl text-[11px] text-slate-600 flex items-center justify-between gap-2 shadow-2xs'>
+                                    <div className='flex items-center gap-1.5'>
+                                      <span className='w-2 h-2 rounded-full bg-slate-400' />
+                                      <span className='font-medium text-slate-600'>ปิดแผนโปะไว้ (คำนวณตามสัญญาปกติ)</span>
+                                    </div>
+                                    <button
+                                      type='button'
+                                      onClick={() => handleTogglePrepayment(res.offer.id)}
+                                      title='กดเพื่อเปิดใช้งานแผนโปะ'
+                                      className='px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-indigo-600 hover:bg-indigo-700 text-white transition whitespace-nowrap cursor-pointer shadow-2xs'
+                                    >
+                                      เปิดโปะ
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             )}
 

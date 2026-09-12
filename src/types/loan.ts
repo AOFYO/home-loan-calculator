@@ -109,6 +109,7 @@ export type PrepaymentMode = 'none' | 'target_monthly' | 'fixed_extra' | 'steppe
 export type PrepaymentAllocation = 'smart_auto' | 'proportional' | 'manual_split';
 
 export interface PrepaymentPlan {
+  enabled?: boolean; // เปิดใช้งานหรือปิดไว้ก่อนไม่ให้มีผลในการคำนวณ
   mode: PrepaymentMode;
   // สำหรับ target_monthly: ยอดผ่อนรวมเป้าหมายต่อเดือนในแต่ละปี (เช่น ปี 1 อยากจ่าย 16,000)
   targetMonthlyYear1?: number;

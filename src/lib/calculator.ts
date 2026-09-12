@@ -434,7 +434,8 @@ export function calculateAdvancedCustomOffer(
       // แผนการโปะ
       let extraPool = 0;
       const prepay = offer.prepayment;
-      if (applyPrepayment && prepay && prepay.mode !== 'none') {
+      const isPrepaymentActive = prepay && prepay.enabled !== false && prepay.mode !== 'none';
+      if (applyPrepayment && isPrepaymentActive) {
         if (prepay.mode === 'target_monthly') {
           let target = 0;
           if (yr === 1) target = prepay.targetMonthlyYear1 || 0;

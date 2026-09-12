@@ -9,7 +9,8 @@ import {
   AlertCircle, 
   Check, 
   Plus, 
-  Trash2
+  Trash2,
+  Copy
 } from 'lucide-react';
 import { CustomBankOffer, SubLoanAccount, PrepaymentPlan, CustomOfferFees, CustomOfferPerk } from '../types/loan';
 
@@ -81,6 +82,7 @@ export const AdvancedOfferModal: React.FC<AdvancedOfferModalProps> = ({
 
   // Prepayment
   const [prepayment, setPrepayment] = useState<PrepaymentPlan>({
+    enabled: true,
     mode: 'target_monthly',
     targetMonthlyYear1: 16000,
     targetMonthlyYear2: 18000,
@@ -95,6 +97,23 @@ export const AdvancedOfferModal: React.FC<AdvancedOfferModalProps> = ({
     allocation: 'smart_auto',
     manualHomeSplitPercent: 70
   });
+
+  const [showCopiedToast, setShowCopiedToast] = useState(false);
+
+  const handleCopyHomeRatesToMRTA = () => {
+    setMrtaLoan(prev => ({
+      ...prev,
+      rateYear1: homeLoan.rateYear1,
+      rateYear2: homeLoan.rateYear2,
+      rateYear3: homeLoan.rateYear3,
+      rateYear4PlusType: homeLoan.rateYear4PlusType,
+      rateYear4PlusFixed: homeLoan.rateYear4PlusFixed,
+      rateYear4PlusBase: homeLoan.rateYear4PlusBase,
+      rateYear4PlusSpread: homeLoan.rateYear4PlusSpread
+    }));
+    setShowCopiedToast(true);
+    setTimeout(() => setShowCopiedToast(false), 2500);
+  };
 
   // Fees
   const [fees, setFees] = useState<CustomOfferFees>({
@@ -168,7 +187,10 @@ export const AdvancedOfferModal: React.FC<AdvancedOfferModalProps> = ({
       }
 
       if (offer.prepayment) {
-        setPrepayment({ ...offer.prepayment });
+        setPrepayment({
+          ...offer.prepayment,
+          enabled: offer.prepayment.enabled !== false
+        });
       }
 
       if (offer.fees) {
@@ -713,10 +735,34 @@ export const AdvancedOfferModal: React.FC<AdvancedOfferModalProps> = ({
               {/* MRTA Loan Rates (if financed) */}
               {hasMRTA && mrtaFinanceWithLoan && (
                 <div className="space-y-3 pt-3 border-t border-slate-200">
-                  <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-600" />
-                    อัตราดอกเบี้ยและยอดผ่อน: วงเงินกู้ MRTA
-                  </h3>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-600" />
+                      อัตราดอกเบี้ยและยอดผ่อน: วงเงินกู้ MRTA
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={handleCopyHomeRatesToMRTA}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition shadow-2xs active:scale-95 cursor-pointer min-h-[36px] ${
+                        showCopiedToast 
+                          ? 'bg-emerald-600 text-white border border-emerald-600' 
+                          : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300'
+                      }`}
+                      title="คัดลอกดอกเบี้ย ปี 1, 2, 3 และ 4+ จากวงเงินกู้บ้านมาใส่วงเงิน MRTA ทันที"
+                    >
+                      {showCopiedToast ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-white" />
+                          <span>✓ ใช้ดอกเบี้ยเดียวกับกู้บ้านแล้ว!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5 text-emerald-700" />
+                          <span>📋 ใช้อัตราดอกเบี้ยเดียวกับวงเงินกู้บ้าน</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                     {/* MRTA Yr 1 */}
@@ -887,6 +933,61 @@ export const AdvancedOfferModal: React.FC<AdvancedOfferModalProps> = ({
           {/* TAB 3: แผนการโปะเพิ่ม */}
           {activeTab === 'prepay' && (
             <div className="space-y-6">
+              {/* Prepayment Master Switch */}
+              <div className={`p-4 sm:p-5 rounded-2xl border transition-all shadow-xs ${
+                prepayment.enabled !== false 
+                  ? 'bg-indigo-50/70 border-indigo-200' 
+                  : 'bg-slate-100/90 border-slate-300'
+              }`}>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2.5 rounded-xl ${
+                      prepayment.enabled !== false ? 'bg-indigo-600 text-white' : 'bg-slate-300 text-slate-600'
+                    }`}>
+                      <TrendingUp className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="font-bold text-sm text-slate-900">
+                          การจำลองแผนโปะเพิ่ม (Prepayment Simulation)
+                        </h3>
+                        <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                          prepayment.enabled !== false 
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' 
+                            : 'bg-slate-200 text-slate-700 border border-slate-300'
+                        }`}>
+                          {prepayment.enabled !== false ? '🟢 เปิดใช้งานคำนวณเงินโปะ' : '⚪ ปิดไว้ก่อน (ไม่นำมาคำนวณ)'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                        {prepayment.enabled !== false
+                          ? 'ระบบจะนำเงินโปะไปตัดเงินต้นและคำนวณการประหยัดดอกเบี้ย/ลดเวลาผ่อนตามแผนที่คุณกำหนด'
+                          : 'ปิดไว้ก่อน: ข้อมูลยอดผ่อนเป้าหมาย/ยอดโปะที่คุณตั้งค่าไว้จะยังคงบันทึกอยู่ แต่ระบบจะไม่นำไปคำนวณตัดหนี้ เพื่อให้คุณดูผลตามสัญญาปกติของธนาคาร'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setPrepayment(prev => ({ ...prev, enabled: prev.enabled === false }))}
+                    className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 min-h-[42px] shadow-xs active:scale-95 whitespace-nowrap cursor-pointer ${
+                      prepayment.enabled !== false
+                        ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                        : 'bg-white hover:bg-slate-50 text-slate-800 border border-slate-300'
+                    }`}
+                  >
+                    <span className={`w-2.5 h-2.5 rounded-full ${prepayment.enabled !== false ? 'bg-emerald-400' : 'bg-slate-400'}`} />
+                    <span>{prepayment.enabled !== false ? 'กดเพื่อปิดแผนโปะไว้ก่อน' : 'กดเพื่อเปิดใช้งานแผนโปะ'}</span>
+                  </button>
+                </div>
+
+                {prepayment.enabled === false && (
+                  <div className="mt-3 pt-3 border-t border-slate-200 text-xs text-slate-500 flex items-center gap-1.5">
+                    <AlertCircle className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                    <span>คุณสามารถปรับแต่งตัวเลขรอไว้ที่ตัวเลือกด้านล่างได้ เมื่อกดเปิดใช้งานจะมีผลต่อการคำนวณทันที</span>
+                  </div>
+                )}
+              </div>
               <div>
                 <label className="block text-xs font-bold text-slate-800 mb-2">
                   เลือกรูปแบบแผนโปะเงินกู้
@@ -1305,8 +1406,84 @@ export const AdvancedOfferModal: React.FC<AdvancedOfferModalProps> = ({
                           </div>
                         </td>
                       </tr>
+                      {/* Fire Insurance */}
+                      <tr>
+                        <td className="py-2.5 px-3 text-slate-800 font-semibold">
+                          <div>🔥 ค่าเบี้ยประกันอัคคีภัย (ชำระวันโอน)</div>
+                          <span className="text-[11px] text-slate-500 font-normal block">
+                            (แต่ละธนาคารคิดอัตราเบี้ยไม่เท่ากัน สามารถระบุยอดจริงได้ที่กล่องด้านล่าง)
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <div className="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-100">
+                            <button
+                              type="button"
+                              onClick={() => setFees({ ...fees, fireInsurance: { ...fees.fireInsurance, payer: 'borrower' } })}
+                              className={`px-3 py-1 rounded text-xs font-bold transition ${
+                                fees.fireInsurance.payer === 'borrower' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500'
+                              }`}
+                            >
+                              ผู้กู้จ่ายสด
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setFees({ ...fees, fireInsurance: { ...fees.fireInsurance, payer: 'bank' } })}
+                              className={`px-3 py-1 rounded text-xs font-bold transition ${
+                                fees.fireInsurance.payer === 'bank' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-500'
+                              }`}
+                            >
+                              🎁 แบงก์ฟรี
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
                     </tbody>
                   </table>
+                </div>
+
+                {/* Custom Fire Insurance Box */}
+                <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200 shadow-xs space-y-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                        <span>🔥 ระบุยอดเบี้ยประกันอัคคีภัยจ่ายสดวันโอน (บาท)</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 font-semibold">
+                          กำหนดเองเฉพาะธนาคารนี้
+                        </span>
+                      </h4>
+                      <p className="text-xs text-amber-800 mt-1 leading-relaxed">
+                        แต่ละธนาคารคิดเบี้ยและระยะเวลาคุ้มครองไม่เท่ากัน (เช่น 3 ปี, 5 ปี หรือตลอดสัญญา) สามารถระบุยอดจริงตามใบเสนอราคาได้ หากเว้นว่างไว้จะใช้ค่าประมาณการ (~฿{(2000 * homeLoan.termYears).toLocaleString()} บ.)
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="relative">
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          placeholder={`Auto: ${(2000 * homeLoan.termYears).toLocaleString()}`}
+                          value={fees.fireInsurance.customAmount !== undefined ? fees.fireInsurance.customAmount : ''}
+                          onChange={e => {
+                            const val = e.target.value === '' ? undefined : Number(e.target.value);
+                            setFees({
+                              ...fees,
+                              fireInsurance: { ...fees.fireInsurance, customAmount: val }
+                            });
+                          }}
+                          className="w-40 px-3.5 py-2 text-sm font-bold text-slate-900 bg-white border border-slate-300 rounded-lg shadow-2xs focus:border-amber-500 focus:ring-2 focus:ring-amber-100 placeholder:text-slate-400 placeholder:font-normal"
+                        />
+                        <span className="absolute right-3 top-2 text-xs font-bold text-slate-400">บาท</span>
+                      </div>
+                      {fees.fireInsurance.customAmount !== undefined && (
+                        <button
+                          type="button"
+                          onClick={() => setFees({ ...fees, fireInsurance: { ...fees.fireInsurance, customAmount: undefined } })}
+                          className="text-xs text-slate-500 hover:text-rose-600 underline font-medium whitespace-nowrap cursor-pointer"
+                        >
+                          ล้างค่า (Auto)
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 

@@ -234,10 +234,35 @@ export const NegotiationSheetModal: React.FC<NegotiationSheetModalProps> = ({
                     ))}
                   </tr>
 
+                  {/* เบี้ยประกันอัคคีภัย */}
+                  <tr>
+                    <td className="p-3 font-medium text-slate-800 border-r border-slate-200">
+                      7. เบี้ยประกันอัคคีภัย (วันโอน)
+                    </td>
+                    {results.map(r => {
+                      const fireFee = r.offer.fees?.fireInsurance;
+                      const payer = fireFee?.payer || 'borrower';
+                      const defaultFire = Math.round(2000 * (r.offer.homeLoan?.termYears || 30));
+                      const amt = fireFee?.customAmount !== undefined ? fireFee.customAmount : defaultFire;
+                      return (
+                        <td key={r.offerId} className="p-3 text-center border-r border-slate-200 last:border-r-0">
+                          {payer === 'bank' ? (
+                            <span className="font-semibold text-emerald-700">🎁 ฟรีแบงก์ออกให้</span>
+                          ) : (
+                            <div>
+                              <span className="font-bold text-slate-900">฿{amt.toLocaleString()}</span>
+                              <span className="block text-[10px] text-slate-500 font-normal">ผู้กู้จ่ายสด</span>
+                            </div>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+
                   {/* ของแถมและ Cashback */}
                   <tr>
                     <td className="p-3 font-medium text-slate-800 border-r border-slate-200">
-                      7. ของแถม / เงินคืน (Cashback)
+                      8. ของแถม / เงินคืน (Cashback)
                     </td>
                     {results.map(r => (
                       <td key={r.offerId} className="p-3 text-center border-r border-slate-200 last:border-r-0">
@@ -280,7 +305,7 @@ export const NegotiationSheetModal: React.FC<NegotiationSheetModalProps> = ({
                   {/* เงินสดวันโอน */}
                   <tr>
                     <td className="p-3 font-medium text-slate-800 border-r border-slate-200">
-                      8. เงินสดที่ต้องเตรียมวันโอน
+                      9. เงินสดที่ต้องเตรียมวันโอน
                     </td>
                     {results.map(r => (
                       <td key={r.offerId} className="p-3 text-center border-r border-slate-200 last:border-r-0 font-semibold text-slate-800">
@@ -292,7 +317,7 @@ export const NegotiationSheetModal: React.FC<NegotiationSheetModalProps> = ({
                   {/* เงื่อนไขสัญญา */}
                   <tr className="bg-slate-50/60">
                     <td className="p-3 font-medium text-slate-800 border-r border-slate-200">
-                      9. เงื่อนไขสัญญาห้ามรีไฟแนนซ์
+                      10. เงื่อนไขสัญญาห้ามรีไฟแนนซ์
                     </td>
                     {results.map(r => (
                       <td key={r.offerId} className="p-3 text-center border-r border-slate-200 last:border-r-0">
