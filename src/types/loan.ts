@@ -196,6 +196,9 @@ export interface YearlyInterestDetail {
   homeEndingBalance: number;
   mrtaEndingBalance: number;
   totalEndingBalance: number;
+  totalRegularPayment: number;
+  totalPrepayment: number;
+  totalPaid: number;
 }
 
 export interface MonthlyAmortizationRow {
@@ -212,9 +215,13 @@ export interface MonthlyAmortizationRow {
   extraPrepayment: number;
   totalPayment: number;
   totalEndingBalance: number;
+  regularPayment: number;
+  prepayment: number;
+  balanceTotal: number;
 }
 
 export interface AdvancedOfferCalculationResult {
+  offer: CustomBankOffer;
   offerId: string;
   offerName: string;
   color: string;
@@ -227,17 +234,22 @@ export interface AdvancedOfferCalculationResult {
   totalPrincipalMRTA: number;
   mrtaPremiumTotal: number;
   borrowerFeesTotal: number;
+  borrowerPaidFees: number;
   bankCoveredFeesTotal: number;
   totalPerksValue: number;
   trueNetCost3Years: number;     // ดอกเบี้ย 3 ปี + เบี้ย MRTA + ค่าธรรมเนียมผู้กู้จ่าย - Perks
   trueNetCostLifetime: number;   // เงินต้น + ดอกเบี้ยตลอดสัญญา + เบี้ย MRTA + ค่าธรรมเนียมผู้กู้จ่าย - Perks
   upfrontCashRequired: number;   // เงินดาวน์ + ค่าธรรมเนียมผู้กู้จ่าย + เบี้ย MRTA จ่ายสด
   monthlyPaymentAvg3Years: number;
+  monthlyPaymentFirst3YearsAvg: number;
   totalMonthsToPayoff: number;
   monthsSavedByPrepayment: number;
   interestSavedByPrepayment: number;
+  prepaymentSavingsInterest: number;
+  prepaymentYearsSaved: number;
   monthlySchedule: MonthlyAmortizationRow[];
   smartPrepaymentAdvice?: string;
+  advisories?: string[];
   lockInWarning?: boolean;
 }
 

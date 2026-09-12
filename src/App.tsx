@@ -1999,8 +1999,9 @@ export default function App() {
       <NegotiationSheetModal
         isOpen={isNegotiationModalOpen}
         onClose={() => setIsNegotiationModalOpen(false)}
-        offers={advancedCustomResults}
+        results={advancedCustomResults}
         propertyPrice={propertyPrice}
+        loanAmount={loanAmount}
       />
 
     </div>

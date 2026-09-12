@@ -507,17 +507,20 @@ export function calculateAdvancedCustomOffer(
       monthlySchedule.push({
         month: m,
         year: yr,
-        homePayment: hStatedPmt + hExtra,
+        homePayment: hStatedPmt,
         homeInterest: hInt,
         homePrincipal: hPrinTotal,
         homeBalance: hBal,
-        mrtaPayment: mStatedPmt + mExtra,
+        mrtaPayment: mStatedPmt,
         mrtaInterest: mInt,
         mrtaPrincipal: mPrinTotal,
         mrtaBalance: mBal,
         extraPrepayment: hExtra + mExtra,
         totalPayment: hStatedPmt + mStatedPmt + hExtra + mExtra,
-        totalEndingBalance: hBal + mBal
+        totalEndingBalance: hBal + mBal,
+        regularPayment: hStatedPmt + mStatedPmt,
+        prepayment: hExtra + mExtra,
+        balanceTotal: hBal + mBal
       });
 
       // รวมรายปี
@@ -537,7 +540,10 @@ export function calculateAdvancedCustomOffer(
           totalPayment: 0,
           homeEndingBalance: 0,
           mrtaEndingBalance: 0,
-          totalEndingBalance: 0
+          totalEndingBalance: 0,
+          totalRegularPayment: 0,
+          totalPrepayment: 0,
+          totalPaid: 0
         });
       }
 
@@ -551,6 +557,9 @@ export function calculateAdvancedCustomOffer(
       yItem.extraPrepayment += (hExtra + mExtra);
       yItem.totalInterest += (hInt + mInt);
       yItem.totalPayment += (hStatedPmt + mStatedPmt + hExtra + mExtra);
+      yItem.totalRegularPayment += (hStatedPmt + mStatedPmt);
+      yItem.totalPrepayment += (hExtra + mExtra);
+      yItem.totalPaid += (hStatedPmt + mStatedPmt + hExtra + mExtra);
       yItem.homeEndingBalance = hBal;
       yItem.mrtaEndingBalance = mBal;
       yItem.totalEndingBalance = hBal + mBal;
@@ -637,7 +646,14 @@ export function calculateAdvancedCustomOffer(
     }
   }
 
+  const advisories: string[] = [];
+  if (smartAdvice) advisories.push(smartAdvice);
+  if (offer.lockInYears === 5) {
+    advisories.push(`⚠️ ข้อเสนอนี้มีเงื่อนไขห้ามรีไฟแนนซ์ 5 ปี กรุณาตรวจสอบอัตราดอกเบี้ยปีที่ 4-5 เพิ่มเติมก่อนตัดสินใจ`);
+  }
+
   return {
+    offer,
     offerId: offer.id,
     offerName: offer.bankName,
     color: offer.color || '#6366f1',
@@ -650,17 +666,22 @@ export function calculateAdvancedCustomOffer(
     totalPrincipalMRTA: mrtaPrincipal,
     mrtaPremiumTotal: mrtaPremium,
     borrowerFeesTotal: borrowerFees,
+    borrowerPaidFees: borrowerFees,
     bankCoveredFeesTotal: bankFees,
     totalPerksValue: totalPerks,
     trueNetCost3Years,
     trueNetCostLifetime,
     upfrontCashRequired: upfrontCash,
     monthlyPaymentAvg3Years: simWithPrepay.avg3YearsMonthly,
+    monthlyPaymentFirst3YearsAvg: simWithPrepay.avg3YearsMonthly,
     totalMonthsToPayoff: simWithPrepay.totalMonthsToPayoff,
     monthsSavedByPrepayment: monthsSaved,
     interestSavedByPrepayment: interestSaved,
+    prepaymentSavingsInterest: interestSaved,
+    prepaymentYearsSaved: Number((monthsSaved / 12).toFixed(1)),
     monthlySchedule: simWithPrepay.monthlySchedule,
     smartPrepaymentAdvice: smartAdvice,
+    advisories,
     lockInWarning: offer.lockInYears === 5
   };
 }
