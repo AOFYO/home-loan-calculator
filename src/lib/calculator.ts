@@ -158,7 +158,8 @@ export function calculateAllFees(
   totalFees: number;
 } {
   const mortgageFee = Math.round(loanAmount * feeConfig.mortgageFeeRate);
-  const stampDuty = Math.round(loanAmount * feeConfig.stampDutyRate);
+  // ค่าอากรแสตมป์: 1 บาท ต่อยอดกู้ทุก 2,000 บาท หรือเศษของ 2,000 บาท (0.05%) สูงสุดไม่เกิน 10,000 บาท ตามประมวลรัษฎากร
+  const stampDuty = Math.min(10000, Math.ceil(loanAmount / 2000));
   const transferFee = Math.round(propertyPrice * feeConfig.transferFeeRate);
   const appraisalFee = feeConfig.appraisalFee;
   const fireInsurance = Math.round(feeConfig.fireInsurancePerYear * loanTermYears);
@@ -608,7 +609,8 @@ export function calculateAdvancedCustomOffer(
   // ค่าธรรมเนียม
   const defaultMortgage = Math.round(homePrincipal * defaultFeeConfig.mortgageFeeRate);
   const defaultTransfer = Math.round(propertyPrice * defaultFeeConfig.transferFeeRate);
-  const defaultStamp = Math.round(homePrincipal * defaultFeeConfig.stampDutyRate);
+  const totalLoanAmt = homePrincipal + (offer.includeMRTA && offer.mrtaLoan?.financeWithLoan ? (offer.mrtaLoan.loanAmount || 0) : 0);
+  const defaultStamp = Math.min(10000, Math.ceil(totalLoanAmt / 2000));
   const defaultAppraisal = defaultFeeConfig.appraisalFee;
   const defaultFire = Math.round(defaultFeeConfig.fireInsurancePerYear * homeTermYears);
 

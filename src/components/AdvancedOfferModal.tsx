@@ -1440,7 +1440,10 @@ export const AdvancedOfferModal: React.FC<AdvancedOfferModalProps> = ({
                       {/* Stamp Duty */}
                       <tr>
                         <td className="py-2.5 px-3 text-slate-800 font-semibold">
-                          ค่าอากรแสตมป์สัญญาเงินกู้ (0.05%)
+                          <div>ค่าอากรแสตมป์สัญญาเงินกู้ (0.05%)</div>
+                          <span className="text-[11px] text-slate-500 font-normal block">
+                            (1 บ. ต่อยอดกู้ทุก 2,000 บ. สูงสุดไม่เกิน 10,000 บ.)
+                          </span>
                         </td>
                         <td className="py-2.5 px-3 text-center">
                           <div className="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-100">
