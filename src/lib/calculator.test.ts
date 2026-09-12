@@ -1,0 +1,185 @@
+import { describe, it, expect } from 'vitest';
+import { 
+  calculatePMT, 
+  calculateAllFees,
+  calculateMRTAPremium,
+  calculateAdvancedCustomOffer 
+} from './calculator';
+import { CustomBankOffer, FeeConfig } from '../types/loan';
+
+const mockFeeConfig: FeeConfig = {
+  mortgageFeeRate: 0.01,
+  transferFeeRate: 0.02,
+  stampDutyRate: 0.0005,
+  appraisalFee: 3000,
+  fireInsurancePerYear: 1000
+};
+
+describe('Financial Formula: calculatePMT', () => {
+  it('calculates standard monthly installment accurately', () => {
+    // กู้ 1,000,000 ดอกเบี้ย 3% ระยะเวลา 30 ปี (360 งวด)
+    const pmt = calculatePMT(1000000, 3.0, 360);
+    // ตามสูตร PMT มาตรฐาน = ~4,216 บาท
+    expect(pmt).toBeGreaterThan(4200);
+    expect(pmt).toBeLessThan(4250);
+  });
+
+  it('handles 0% interest rate gracefully', () => {
+    const pmt = calculatePMT(120000, 0, 12);
+    expect(pmt).toBe(10000);
+  });
+});
+
+import { DEFAULT_MRTA_COMPANIES } from '../data/masterData';
+
+describe('MRTA Premium Calculation', () => {
+  it('calculates MRTA premium based on age bracket and loan term', () => {
+    const premium = calculateMRTAPremium(1000000, 30, 10, DEFAULT_MRTA_COMPANIES[0]);
+    expect(premium).toBeGreaterThan(0);
+    // AIA: อายุ 30 กู้ 10 ปี เรท 30.0 บาทต่อพัน -> 1,000,000 / 1,000 * 30.0 = 30,000 บาท
+    expect(premium).toBe(30000);
+  });
+});
+
+describe('Fee & Stamp Duty Calculations', () => {
+  it('calculates stamp duty with 0.05% rate and 10,000 THB legal cap', () => {
+    // 1 ล้าน -> 500 บ.
+    const fees1M = calculateAllFees(1200000, 1000000, 30, mockFeeConfig);
+    expect(fees1M.stampDuty).toBe(500);
+
+    // 3,575,000 -> 1,788 บ. (ปัดเศษ 1 บ. ทุก 2,000 บ.)
+    const fees3_5M = calculateAllFees(4000000, 3575000, 30, mockFeeConfig);
+    expect(fees3_5M.stampDuty).toBe(1788);
+
+    // 25,000,000 -> เพดานตามกฎหมายสูงสุดไม่เกิน 10,000 บ.
+    const fees25M = calculateAllFees(30000000, 25000000, 30, mockFeeConfig);
+    expect(fees25M.stampDuty).toBe(10000);
+  });
+});
+
+describe('Advanced Custom Offer Calculations', () => {
+  const baseOffer: CustomBankOffer = {
+    id: 'test_offer',
+    bankName: 'ธนาคารทดสอบ',
+    color: '#3b82f6',
+    rateYear1: 2.5,
+    rateYear2: 3.0,
+    rateYear3: 3.5,
+    rateYear4PlusType: 'fixed',
+    rateYear4PlusFixed: 5.5,
+    rateYear4PlusBase: 'MRR',
+    rateYear4PlusSpread: -1.5,
+    mrtaDiscountRate: 0,
+    isAdvanced: true,
+    propertyPrice: 4000000,
+    homeLoan: {
+      loanAmount: 3575000,
+      termYears: 30,
+      rateYear1: 2.29,
+      rateYear2: 2.29,
+      rateYear3: 2.29,
+      rateYear4PlusType: 'floating',
+      rateYear4PlusFixed: 5.5,
+      rateYear4PlusBase: 'MRR',
+      rateYear4PlusSpread: -1.25,
+      bankInstallmentYear1: 16000,
+      bankInstallmentYear2: 16000,
+      bankInstallmentYear3: 16000,
+      bankInstallmentYear4Plus: 16000
+    }
+  };
+
+  it('calculates dual-account installment accurately when MRTA is included (16,000 + 1,100 = 17,100)', () => {
+    const offerWithMRTA: CustomBankOffer = {
+      ...baseOffer,
+      includeMRTA: true,
+      mrtaLoan: {
+        totalPremium: 143000,
+        financeWithLoan: true,
+        loanAmount: 143000,
+        termYears: 10,
+        rateYear1: 2.29,
+        rateYear2: 2.29,
+        rateYear3: 2.29,
+        rateYear4PlusType: 'floating',
+        rateYear4PlusFixed: 5.5,
+        rateYear4PlusBase: 'MRR',
+        rateYear4PlusSpread: -1.0,
+        bankInstallmentYear1: 1100,
+        bankInstallmentYear2: 1100,
+        bankInstallmentYear3: 1100,
+        bankInstallmentYear4Plus: 1100
+      }
+    };
+
+    const result = calculateAdvancedCustomOffer(offerWithMRTA, 4000000, 3575000, 30, 30, mockFeeConfig);
+
+    // ตรวจสอบค่างวดเรียกเก็บรวมงวดแรกในตาราง = 16,000 + 1,100 = 17,100
+    expect(result.monthlySchedule[0].regularPayment).toBe(17100);
+    expect(result.monthlySchedule[0].homePayment).toBe(16000);
+    expect(result.monthlySchedule[0].mrtaPayment).toBe(1100);
+
+    // ตรวจสอบค่าเฉลี่ย 3 ปีแรกในการ์ด = 17,100
+    expect(result.monthlyPaymentFirst3YearsAvg).toBe(17100);
+    expect(result.avg3YearsHomeMonthly).toBe(16000);
+    expect(result.avg3YearsMrtaMonthly).toBe(1100);
+    expect(result.totalPrincipalMRTA).toBe(143000);
+  });
+
+  it('runs safely without error when MRTA is unchecked (includeMRTA: false, mrtaLoan: undefined)', () => {
+    const offerWithoutMRTA: CustomBankOffer = {
+      ...baseOffer,
+      includeMRTA: false,
+      mrtaLoan: undefined
+    };
+
+    // ต้องไม่โยน runtime exception
+    expect(() => {
+      const result = calculateAdvancedCustomOffer(offerWithoutMRTA, 4000000, 3575000, 30, 30, mockFeeConfig);
+      expect(result.totalPrincipalMRTA).toBe(0);
+      expect(result.mrtaPremiumTotal).toBe(0);
+      expect(result.interest3YearsMRTA).toBe(0);
+      expect(result.monthlyPaymentFirst3YearsAvg).toBe(16000);
+    }).not.toThrow();
+  });
+
+  it('calculates prepayment savings correctly in target_monthly mode', () => {
+    const offerWithPrepayment: CustomBankOffer = {
+      ...baseOffer,
+      includeMRTA: false,
+      prepayment: {
+        mode: 'target_monthly',
+        enabled: true,
+        targetMonthlyYear1: 20000, // สัญญา 16,000 ตั้งใจผ่อน 20,000 -> โปะเดือนละ 4,000
+        targetMonthlyYear2: 20000,
+        targetMonthlyYear3: 20000,
+        targetMonthlyYear4Plus: 20000
+      }
+    };
+
+    const result = calculateAdvancedCustomOffer(offerWithPrepayment, 4000000, 3575000, 30, 30, mockFeeConfig);
+
+    // ตรวจสอบยอดโปะงวดแรก = 20,000 - 16,000 = 4,000
+    expect(result.monthlySchedule[0].prepayment).toBe(4000);
+    expect(result.monthlySchedule[0].totalPayment).toBe(20000);
+    expect(result.prepaymentSavingsInterest).toBeGreaterThan(0);
+    expect(result.prepaymentYearsSaved).toBeGreaterThan(0);
+  });
+
+  it('respects prepayment toggle when disabled', () => {
+    const offerDisabledPrepay: CustomBankOffer = {
+      ...baseOffer,
+      includeMRTA: false,
+      prepayment: {
+        mode: 'target_monthly',
+        enabled: false,
+        targetMonthlyYear1: 20000
+      }
+    };
+
+    const result = calculateAdvancedCustomOffer(offerDisabledPrepay, 4000000, 3575000, 30, 30, mockFeeConfig);
+    expect(result.monthlySchedule[0].prepayment).toBe(0);
+    expect(result.monthlySchedule[0].totalPayment).toBe(16000);
+    expect(result.prepaymentSavingsInterest).toBe(0);
+  });
+});
