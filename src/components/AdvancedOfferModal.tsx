@@ -1162,6 +1162,71 @@ export const AdvancedOfferModal: React.FC<AdvancedOfferModalProps> = ({
                       />
                     </div>
                   </div>
+                  {/* Growth rate after Year 4 */}
+                  <div className="mt-3 pt-3 border-t border-indigo-200/60">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs font-bold text-indigo-900">📈 อัตราเพิ่มขึ้นหลังปีที่ 4</span>
+                      <span className="text-[10px] text-indigo-500 font-medium">(ไม่บังคับ — ปล่อยว่างเพื่อคงที่)</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex rounded-lg border border-indigo-300 overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => setPrepayment({ ...prepayment, targetMonthlyYear4PlusGrowthType: 'fixed' })}
+                          className={`px-3 py-1.5 text-xs font-bold transition ${
+                            (prepayment.targetMonthlyYear4PlusGrowthType || 'fixed') === 'fixed'
+                              ? 'bg-indigo-600 text-white'
+                              : 'bg-white text-slate-600 hover:bg-indigo-50'
+                          }`}
+                        >
+                          ฿ คงที่/ปี
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPrepayment({ ...prepayment, targetMonthlyYear4PlusGrowthType: 'percent' })}
+                          className={`px-3 py-1.5 text-xs font-bold transition ${
+                            prepayment.targetMonthlyYear4PlusGrowthType === 'percent'
+                              ? 'bg-indigo-600 text-white'
+                              : 'bg-white text-slate-600 hover:bg-indigo-50'
+                          }`}
+                        >
+                          % ต่อปี
+                        </button>
+                      </div>
+                      <div className="flex-1 relative">
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          placeholder="เช่น 500"
+                          value={prepayment.targetMonthlyYear4PlusGrowth || ''}
+                          onChange={e => setPrepayment({ ...prepayment, targetMonthlyYear4PlusGrowth: Number(e.target.value) || undefined })}
+                          className="w-full px-3 py-1.5 text-sm font-bold text-slate-900 bg-white rounded-lg border border-slate-300 shadow-2xs focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100"
+                        />
+                      </div>
+                      <span className="text-xs text-slate-500 whitespace-nowrap">
+                        {(prepayment.targetMonthlyYear4PlusGrowthType || 'fixed') === 'fixed' ? 'บ./ปี' : '%/ปี'}
+                      </span>
+                    </div>
+                    {prepayment.targetMonthlyYear4PlusGrowth && prepayment.targetMonthlyYear4Plus ? (
+                      <div className="mt-2 text-[10px] text-indigo-600 bg-indigo-50 rounded-lg px-3 py-2">
+                        ตัวอย่าง: ปีที่ 5 ={' '}
+                        <span className="font-bold">
+                          {(prepayment.targetMonthlyYear4PlusGrowthType || 'fixed') === 'fixed'
+                            ? (prepayment.targetMonthlyYear4Plus + prepayment.targetMonthlyYear4PlusGrowth).toLocaleString()
+                            : Math.round(prepayment.targetMonthlyYear4Plus * (1 + prepayment.targetMonthlyYear4PlusGrowth / 100)).toLocaleString()
+                          } บ.
+                        </span>
+                        {', ปีที่ 6 = '}
+                        <span className="font-bold">
+                          {(prepayment.targetMonthlyYear4PlusGrowthType || 'fixed') === 'fixed'
+                            ? (prepayment.targetMonthlyYear4Plus + 2 * prepayment.targetMonthlyYear4PlusGrowth).toLocaleString()
+                            : Math.round(prepayment.targetMonthlyYear4Plus * Math.pow(1 + prepayment.targetMonthlyYear4PlusGrowth / 100, 2)).toLocaleString()
+                          } บ.
+                        </span>
+                      </div>
+                    ) : null}
+                  </div>
+
                 </div>
               )}
 
@@ -1212,8 +1277,73 @@ export const AdvancedOfferModal: React.FC<AdvancedOfferModalProps> = ({
                       />
                     </div>
                   </div>
+                  {/* Growth rate after Year 4 — stepped mode */}
+                  <div className="mt-3 pt-3 border-t border-slate-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs font-bold text-slate-800">📈 อัตราเพิ่มขึ้นหลังปีที่ 4</span>
+                      <span className="text-[10px] text-slate-500 font-medium">(ไม่บังคับ — ปล่อยว่างเพื่อคงที่)</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex rounded-lg border border-slate-300 overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => setPrepayment({ ...prepayment, steppedYear4PlusGrowthType: 'fixed' })}
+                          className={`px-3 py-1.5 text-xs font-bold transition ${
+                            (prepayment.steppedYear4PlusGrowthType || 'fixed') === 'fixed'
+                              ? 'bg-slate-700 text-white'
+                              : 'bg-white text-slate-600 hover:bg-slate-50'
+                          }`}
+                        >
+                          ฿ คงที่/ปี
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPrepayment({ ...prepayment, steppedYear4PlusGrowthType: 'percent' })}
+                          className={`px-3 py-1.5 text-xs font-bold transition ${
+                            prepayment.steppedYear4PlusGrowthType === 'percent'
+                              ? 'bg-slate-700 text-white'
+                              : 'bg-white text-slate-600 hover:bg-slate-50'
+                          }`}
+                        >
+                          % ต่อปี
+                        </button>
+                      </div>
+                      <div className="flex-1">
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          placeholder="เช่น 200"
+                          value={prepayment.steppedYear4PlusGrowth || ''}
+                          onChange={e => setPrepayment({ ...prepayment, steppedYear4PlusGrowth: Number(e.target.value) || undefined })}
+                          className="w-full px-3 py-1.5 text-sm font-bold text-slate-900 bg-white rounded-lg border border-slate-300 shadow-2xs focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100"
+                        />
+                      </div>
+                      <span className="text-xs text-slate-500 whitespace-nowrap">
+                        {(prepayment.steppedYear4PlusGrowthType || 'fixed') === 'fixed' ? 'บ./ปี' : '%/ปี'}
+                      </span>
+                    </div>
+                    {prepayment.steppedYear4PlusGrowth && prepayment.steppedYear4Plus ? (
+                      <div className="mt-2 text-[10px] text-slate-600 bg-slate-100 rounded-lg px-3 py-2">
+                        ตัวอย่าง: ปีที่ 5 โปะ{' '}
+                        <span className="font-bold">
+                          {(prepayment.steppedYear4PlusGrowthType || 'fixed') === 'fixed'
+                            ? (prepayment.steppedYear4Plus + prepayment.steppedYear4PlusGrowth).toLocaleString()
+                            : Math.round(prepayment.steppedYear4Plus * (1 + prepayment.steppedYear4PlusGrowth / 100)).toLocaleString()
+                          } บ./ด.
+                        </span>
+                        {', ปีที่ 6 โปะ '}
+                        <span className="font-bold">
+                          {(prepayment.steppedYear4PlusGrowthType || 'fixed') === 'fixed'
+                            ? (prepayment.steppedYear4Plus + 2 * prepayment.steppedYear4PlusGrowth).toLocaleString()
+                            : Math.round(prepayment.steppedYear4Plus * Math.pow(1 + prepayment.steppedYear4PlusGrowth / 100, 2)).toLocaleString()
+                          } บ./ด.
+                        </span>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               )}
+
 
               {prepayment.mode === 'fixed_extra' && (
                 <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">

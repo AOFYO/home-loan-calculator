@@ -381,6 +381,8 @@ export function calculateAdvancedCustomOffer(
     let totalMonthsToPayoff = 0;
     let totalHomeInterest = 0;
     let totalMrtaInterest = 0;
+    let homePayoffMonth = 0;
+    let mrtaPayoffMonth = 0;
     let first3YearsHomeMonthly: number[] = [];
     let first3YearsMrtaMonthly: number[] = [];
     let first3YearsTotalMonthly: number[] = [];
@@ -444,7 +446,19 @@ export function calculateAdvancedCustomOffer(
           if (yr === 1) target = prepay.targetMonthlyYear1 || 0;
           else if (yr === 2) target = prepay.targetMonthlyYear2 || 0;
           else if (yr === 3) target = prepay.targetMonthlyYear3 || 0;
-          else target = prepay.targetMonthlyYear4Plus || 0;
+          else {
+            const base = prepay.targetMonthlyYear4Plus || 0;
+            const yearsOver4 = yr - 4;
+            const growth = prepay.targetMonthlyYear4PlusGrowth || 0;
+            const growthType = prepay.targetMonthlyYear4PlusGrowthType || 'fixed';
+            if (growth > 0 && yearsOver4 > 0) {
+              target = growthType === 'percent'
+                ? Math.round(base * Math.pow(1 + growth / 100, yearsOver4))
+                : base + yearsOver4 * growth;
+            } else {
+              target = base;
+            }
+          }
 
           const regularSum = hStatedPmt + mStatedPmt;
           if (target > regularSum) {
@@ -456,7 +470,19 @@ export function calculateAdvancedCustomOffer(
           if (yr === 1) extraPool = prepay.steppedYear1 || 0;
           else if (yr === 2) extraPool = prepay.steppedYear2 || 0;
           else if (yr === 3) extraPool = prepay.steppedYear3 || 0;
-          else extraPool = prepay.steppedYear4Plus || 0;
+          else {
+            const base = prepay.steppedYear4Plus || 0;
+            const yearsOver4 = yr - 4;
+            const growth = prepay.steppedYear4PlusGrowth || 0;
+            const growthType = prepay.steppedYear4PlusGrowthType || 'fixed';
+            if (growth > 0 && yearsOver4 > 0) {
+              extraPool = growthType === 'percent'
+                ? Math.round(base * Math.pow(1 + growth / 100, yearsOver4))
+                : base + yearsOver4 * growth;
+            } else {
+              extraPool = base;
+            }
+          }
         }
 
         if (m % 12 === 0 && prepay.annualBonusExtra) {
@@ -499,8 +525,13 @@ export function calculateAdvancedCustomOffer(
       hBal = Math.max(0, hBal - hPrinTotal);
       mBal = Math.max(0, mBal - mPrinTotal);
 
+      // track ปีที่ผ่อนหมดแยกบ้านและ MRTA
+      if (hBal <= 0 && homePayoffMonth === 0) homePayoffMonth = m;
+      if (mBal <= 0 && mrtaPayoffMonth === 0 && mrtaPrincipal > 0) mrtaPayoffMonth = m;
+
       totalHomeInterest += hInt;
       totalMrtaInterest += mInt;
+
 
       if (m <= 36) {
         first3YearsHomeMonthly.push(hStatedPmt + hExtra);
@@ -589,7 +620,9 @@ export function calculateAdvancedCustomOffer(
         : 0,
       avg3YearsMrtaMonthly: first3YearsMrtaMonthly.length > 0
         ? Math.round(first3YearsMrtaMonthly.reduce((a, b) => a + b, 0) / first3YearsMrtaMonthly.length)
-        : 0
+        : 0,
+      homePayoffMonth,
+      mrtaPayoffMonth
     };
   };
 
@@ -697,10 +730,17 @@ export function calculateAdvancedCustomOffer(
     interestSavedByPrepayment: interestSaved,
     prepaymentSavingsInterest: interestSaved,
     prepaymentYearsSaved: Number((monthsSaved / 12).toFixed(1)),
+    totalHomeInterestPaid: simWithPrepay.totalHomeInterest,
+    totalMrtaInterestPaid: simWithPrepay.totalMrtaInterest,
+    totalHomePaid: homePrincipal + simWithPrepay.totalHomeInterest,
+    totalMrtaPaid: mrtaPrincipal + simWithPrepay.totalMrtaInterest,
+    homePayoffYear: simWithPrepay.homePayoffMonth > 0 ? Math.ceil(simWithPrepay.homePayoffMonth / 12) : 0,
+    mrtaPayoffYear: simWithPrepay.mrtaPayoffMonth > 0 ? Math.ceil(simWithPrepay.mrtaPayoffMonth / 12) : 0,
     monthlySchedule: simWithPrepay.monthlySchedule,
     smartPrepaymentAdvice: smartAdvice,
     advisories,
     lockInWarning: offer.lockInYears === 5
   };
+
 }
 

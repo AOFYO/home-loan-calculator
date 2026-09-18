@@ -116,6 +116,9 @@ export interface PrepaymentPlan {
   targetMonthlyYear2?: number;
   targetMonthlyYear3?: number;
   targetMonthlyYear4Plus?: number;
+  // อัตราเพิ่มขึ้นต่อปีหลังปีที่ 4 (สำหรับ target_monthly)
+  targetMonthlyYear4PlusGrowth?: number;          // ค่าที่เพิ่มต่อปี (บาท หรือ %)
+  targetMonthlyYear4PlusGrowthType?: 'fixed' | 'percent'; // ประเภทการเพิ่ม
   // สำหรับ fixed_extra: ยอดโปะเพิ่มคงที่ต่อเดือน
   fixedExtraMonthly?: number;
   // สำหรับ stepped: ยอดโปะเพิ่มในแต่ละช่วงปี
@@ -123,6 +126,9 @@ export interface PrepaymentPlan {
   steppedYear2?: number;
   steppedYear3?: number;
   steppedYear4Plus?: number;
+  // อัตราเพิ่มขึ้นต่อปีหลังปีที่ 4 (สำหรับ stepped)
+  steppedYear4PlusGrowth?: number;               // ค่าที่เพิ่มต่อปี (บาท หรือ %)
+  steppedYear4PlusGrowthType?: 'fixed' | 'percent'; // ประเภทการเพิ่ม
   // โปะก้อนใหญ่รายปี (เช่น โบนัสออกทุกสิ้นปี)
   annualBonusExtra?: number;
   // การจัดสรรเงินโปะ
@@ -253,6 +259,13 @@ export interface AdvancedOfferCalculationResult {
   interestSavedByPrepayment: number;
   prepaymentSavingsInterest: number;
   prepaymentYearsSaved: number;
+  // สรุปยอดรวมแยกบ้านและ MRTA
+  totalHomeInterestPaid: number;   // ดอกเบี้ยบ้านรวมตลอดสัญญา
+  totalMrtaInterestPaid: number;   // ดอกเบี้ย MRTA รวมตลอดสัญญา
+  totalHomePaid: number;           // เงินที่ชำระบ้านทั้งสิ้น (ต้น + ดอก)
+  totalMrtaPaid: number;           // เงินที่ชำระ MRTA ทั้งสิ้น (ต้น + ดอก)
+  homePayoffYear: number;          // ปีที่บ้านผ่อนหมด
+  mrtaPayoffYear: number;          // ปีที่ MRTA ผ่อนหมด (0 ถ้าไม่มี MRTA)
   monthlySchedule: MonthlyAmortizationRow[];
   smartPrepaymentAdvice?: string;
   advisories?: string[];

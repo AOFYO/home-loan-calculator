@@ -232,3 +232,116 @@ describe('Standard Preset Bank Loan Calculation', () => {
     expect(result.schedule.length).toBe(360);
   });
 });
+
+describe('Feature 1: Year 4+ Growth Rate in Prepayment', () => {
+  const baseOffer: CustomBankOffer = {
+    id: 'growth-test',
+    bankName: 'TestBank Growth',
+    color: '#000',
+    rateYear1: 3.0, rateYear2: 3.0, rateYear3: 3.0,
+    rateYear4PlusType: 'fixed', rateYear4PlusFixed: 5.0,
+    rateYear4PlusBase: 'MRR', rateYear4PlusSpread: 0,
+    mrtaDiscountRate: 0,
+    isAdvanced: true,
+    includeMRTA: false,
+    homeLoan: {
+      loanAmount: 2000000, termYears: 30,
+      rateYear1: 3.0, rateYear2: 3.0, rateYear3: 3.0,
+      rateYear4PlusType: 'fixed', rateYear4PlusFixed: 5.0,
+      rateYear4PlusBase: 'MRR', rateYear4PlusSpread: 0
+    },
+    prepayment: {
+      enabled: true,
+      mode: 'target_monthly',
+      targetMonthlyYear1: 12000,
+      targetMonthlyYear2: 13000,
+      targetMonthlyYear3: 14000,
+      targetMonthlyYear4Plus: 15000,
+      targetMonthlyYear4PlusGrowth: 500,
+      targetMonthlyYear4PlusGrowthType: 'fixed',
+      allocation: 'smart_auto'
+    }
+  };
+
+  it('target_monthly with fixed growth pays off earlier than no-growth', () => {
+    const withGrowth = calculateAdvancedCustomOffer(baseOffer, 2500000, 2000000, 30, 30, mockFeeConfig);
+    const noGrowth = calculateAdvancedCustomOffer({
+      ...baseOffer,
+      prepayment: { ...baseOffer.prepayment!, targetMonthlyYear4PlusGrowth: 0 }
+    }, 2500000, 2000000, 30, 30, mockFeeConfig);
+
+    // ผ่อนโปะมากขึ้นทุกปี ควรผ่อนหมดเร็วกว่า
+    expect(withGrowth.totalMonthsToPayoff).toBeLessThan(noGrowth.totalMonthsToPayoff);
+    // และประหยัดดอกเบี้ยได้มากกว่า
+    expect(withGrowth.totalInterestLifetime).toBeLessThan(noGrowth.totalInterestLifetime);
+  });
+
+  it('stepped mode with percent growth escalates extraPool correctly', () => {
+    const steppedOffer: CustomBankOffer = {
+      ...baseOffer,
+      prepayment: {
+        enabled: true,
+        mode: 'stepped',
+        steppedYear1: 1000,
+        steppedYear2: 2000,
+        steppedYear3: 3000,
+        steppedYear4Plus: 4000,
+        steppedYear4PlusGrowth: 10,
+        steppedYear4PlusGrowthType: 'percent',
+        allocation: 'smart_auto'
+      }
+    };
+    const withGrowth = calculateAdvancedCustomOffer(steppedOffer, 2500000, 2000000, 30, 30, mockFeeConfig);
+    const noGrowth = calculateAdvancedCustomOffer({
+      ...steppedOffer,
+      prepayment: { ...steppedOffer.prepayment!, steppedYear4PlusGrowth: 0 }
+    }, 2500000, 2000000, 30, 30, mockFeeConfig);
+
+    expect(withGrowth.totalMonthsToPayoff).toBeLessThan(noGrowth.totalMonthsToPayoff);
+  });
+});
+
+describe('Feature 2: Loan Summary Fields (totalHomePaid, homePayoffYear, etc.)', () => {
+  const summaryOffer: CustomBankOffer = {
+    id: 'summary-test',
+    bankName: 'TestBank Summary',
+    color: '#000',
+    rateYear1: 2.75, rateYear2: 2.75, rateYear3: 2.75,
+    rateYear4PlusType: 'fixed', rateYear4PlusFixed: 4.5,
+    rateYear4PlusBase: 'MRR', rateYear4PlusSpread: 0,
+    mrtaDiscountRate: 0,
+    isAdvanced: true,
+    includeMRTA: false,
+    homeLoan: {
+      loanAmount: 3000000, termYears: 30,
+      rateYear1: 2.75, rateYear2: 2.75, rateYear3: 2.75,
+      rateYear4PlusType: 'fixed', rateYear4PlusFixed: 4.5,
+      rateYear4PlusBase: 'MRR', rateYear4PlusSpread: 0
+    }
+  };
+
+  it('returns totalHomePaid = totalPrincipalHome + totalHomeInterestPaid', () => {
+    const result = calculateAdvancedCustomOffer(summaryOffer, 3600000, 3000000, 30, 30, mockFeeConfig);
+    expect(result.totalHomePaid).toBe(result.totalPrincipalHome + result.totalHomeInterestPaid);
+    expect(result.totalHomeInterestPaid).toBeGreaterThan(0);
+    expect(result.homePayoffYear).toBeGreaterThan(0);
+    expect(result.homePayoffYear).toBeLessThanOrEqual(30);
+  });
+
+  it('homePayoffYear is less than termYears when prepayment is active', () => {
+    const offerWithPrepay: CustomBankOffer = {
+      ...summaryOffer,
+      prepayment: {
+        enabled: true,
+        mode: 'fixed_extra',
+        fixedExtraMonthly: 5000,
+        allocation: 'smart_auto'
+      }
+    };
+    const withPrepay = calculateAdvancedCustomOffer(offerWithPrepay, 3600000, 3000000, 30, 30, mockFeeConfig);
+    const baseline = calculateAdvancedCustomOffer(summaryOffer, 3600000, 3000000, 30, 30, mockFeeConfig);
+
+    // โปะเพิ่มต้องผ่อนหมดเร็วกว่า
+    expect(withPrepay.homePayoffYear).toBeLessThan(baseline.homePayoffYear);
+  });
+});

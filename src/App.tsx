@@ -1650,6 +1650,57 @@ export default function App() {
                               <span className='font-semibold text-slate-800'>{res.trueNetCostLifetime.toLocaleString()} ฿</span>
                             </div>
 
+                            {/* Summary breakdown — always visible */}
+                            <div className='mt-3 pt-3 border-t border-slate-100'>
+                              <div className='text-[10px] font-bold text-slate-600 mb-2 uppercase tracking-wide'>สรุปยอดรวมตลอดสัญญา</div>
+                              <table className='w-full text-[10px]'>
+                                <thead>
+                                  <tr className='text-slate-400'>
+                                    <th className='text-left pb-1 font-medium'></th>
+                                    <th className='text-right pb-1 font-medium text-blue-600'>บ้าน</th>
+                                    {res.offer.includeMRTA !== false && res.offer.mrtaLoan && res.totalPrincipalMRTA > 0 && (
+                                      <th className='text-right pb-1 font-medium text-purple-600'>MRTA</th>
+                                    )}
+                                  </tr>
+                                </thead>
+                                <tbody className='divide-y divide-slate-100'>
+                                  <tr>
+                                    <td className='py-1 text-slate-500'>เงินที่ชำระทั้งสิ้น</td>
+                                    <td className='py-1 text-right font-bold text-slate-800'>{res.totalHomePaid.toLocaleString()}</td>
+                                    {res.offer.includeMRTA !== false && res.offer.mrtaLoan && res.totalPrincipalMRTA > 0 && (
+                                      <td className='py-1 text-right font-bold text-slate-800'>{res.totalMrtaPaid.toLocaleString()}</td>
+                                    )}
+                                  </tr>
+                                  <tr>
+                                    <td className='py-1 text-slate-500'>ดอกเบี้ยจ่ายรวม</td>
+                                    <td className='py-1 text-right font-semibold text-rose-600'>{res.totalHomeInterestPaid.toLocaleString()}</td>
+                                    {res.offer.includeMRTA !== false && res.offer.mrtaLoan && res.totalPrincipalMRTA > 0 && (
+                                      <td className='py-1 text-right font-semibold text-rose-500'>{res.totalMrtaInterestPaid.toLocaleString()}</td>
+                                    )}
+                                  </tr>
+                                  <tr>
+                                    <td className='py-1 text-slate-500'>เงินต้นที่จ่ายรวม</td>
+                                    <td className='py-1 text-right font-semibold text-emerald-700'>{res.totalPrincipalHome.toLocaleString()}</td>
+                                    {res.offer.includeMRTA !== false && res.offer.mrtaLoan && res.totalPrincipalMRTA > 0 && (
+                                      <td className='py-1 text-right font-semibold text-emerald-600'>{res.totalPrincipalMRTA.toLocaleString()}</td>
+                                    )}
+                                  </tr>
+                                  <tr>
+                                    <td className='py-1 text-slate-500'>ปีที่ผ่อนหมด</td>
+                                    <td className='py-1 text-right font-bold text-indigo-700'>
+                                      {res.homePayoffYear > 0 ? `ปีที่ ${res.homePayoffYear}` : '—'}
+                                    </td>
+                                    {res.offer.includeMRTA !== false && res.offer.mrtaLoan && res.totalPrincipalMRTA > 0 && (
+                                      <td className='py-1 text-right font-bold text-purple-700'>
+                                        {res.mrtaPayoffYear > 0 ? `ปีที่ ${res.mrtaPayoffYear}` : '—'}
+                                      </td>
+                                    )}
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+
+
                             <button
                               type='button'
                               onClick={() => {
