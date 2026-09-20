@@ -91,9 +91,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       parts.push({ text: `(ไฟล์ชื่อ: ${file.name})` });
     }
 
-    // เรียก Gemini 2.0 Flash
+    // เรียก Gemini 2.5 Flash
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash',
       contents: [{ role: 'user', parts }],
       config: {
         temperature: 0.1,      // ต้องการความแม่นยำ ไม่ใช่ creativity
