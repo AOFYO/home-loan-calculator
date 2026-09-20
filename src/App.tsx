@@ -1,4 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { HubLayout } from './components/HubLayout';
+import type { ModuleId } from './components/Sidebar';
+import { InspectionComparator } from './modules/inspection/InspectionComparator';
 import { 
   Building2, 
   RefreshCw, 
@@ -38,6 +41,9 @@ import { AdvancedOfferModal } from './components/AdvancedOfferModal';
 import { NegotiationSheetModal } from './components/NegotiationSheetModal';
 
 export default function App() {
+  // --- Hub Module Routing ---
+  const [currentModule, setCurrentModule] = useState<ModuleId>('loan');
+
   // --- Form Inputs State (Default: Down payment 0, Term 30 years) ---
   const [loanInputMode, setLoanInputMode] = useState<'direct' | 'property'>('direct');
   const [loanAmount, setLoanAmount] = useState<number>(3000000);
@@ -777,6 +783,12 @@ export default function App() {
   };
 
   return (
+    <HubLayout currentModule={currentModule} onModuleChange={setCurrentModule}>
+      {/* =================== MODULE: ตรวจบ้าน =================== */}
+      {currentModule === 'inspection' && <InspectionComparator />}
+
+      {/* =================== MODULE: สินเชื่อบ้าน =================== */}
+      {currentModule === 'loan' && (
     <div className='min-h-screen bg-slate-50 text-slate-800 pb-16'>
       <header className='bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs'>
         <div className='max-w-7xl mx-auto px-4 h-16 flex items-center justify-between'>
@@ -2138,5 +2150,7 @@ export default function App() {
       />
 
     </div>
+      )}
+    </HubLayout>
   );
 }

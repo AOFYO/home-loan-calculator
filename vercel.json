@@ -5,6 +5,12 @@
       "destination": "/api/$1"
     }
   ],
+  "functions": {
+    "api/analyze-inspection.ts": {
+      "maxDuration": 60,
+      "memory": 1024
+    }
+  },
   "crons": [
     {
       "path": "/api/bot-rates",
