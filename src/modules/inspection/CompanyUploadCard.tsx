@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Upload, X, Loader2, CheckCircle2, AlertCircle, FileText, Image, File, AlertTriangle } from 'lucide-react';
 import type { CompanyReport, AnalyzeInspectionRequest } from './types';
 

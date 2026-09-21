@@ -1,4 +1,4 @@
-﻿import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { Redis } from '@upstash/redis';
 
 // ถ้ามี Upstash Redis ให้เปิดใช้ ถ้าไม่มีจะ fallback ได้
@@ -69,7 +69,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     if (!response.ok) {
-      throw new Error(BOT API responded with status );
+      throw new Error(`BOT API responded with status ${response.status}`);
     }
 
     const result = await response.json();
