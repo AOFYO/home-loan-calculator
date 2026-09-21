@@ -100,10 +100,10 @@ ${STANDARD_ITEMS_CONTEXT}
 }`;
 
 const MODEL_FALLBACK_LIST = [
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
   'gemini-3.6-flash',
-  'gemini-2.5-flash-preview-05-20',
   'gemini-1.5-flash',
-  'gemini-1.5-flash-latest',
 ];
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -230,17 +230,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     } catch (err: any) {
       const msg: string = err?.message ?? String(err);
-      if (msg.includes('404') || msg.includes('NOT_FOUND') || msg.includes('no longer available') || msg.includes('not found')) {
-        console.warn(`[analyze-inspection] model ${modelName} unavailable, trying next...`);
-        lastError = err;
+      console.warn(`[analyze-inspection] error with ${modelName}:`, msg);
+      lastError = err;
+
+      // ตรวจสอบทั้ง 404 (ไม่พบโมเดล) และ 429 (โควตา/Rate Limit เต็ม)
+      const isUnavailable = msg.includes('404') || msg.includes('NOT_FOUND') || msg.includes('no longer available') || msg.includes('not found');
+      const isQuotaExceeded = msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota') || msg.includes('exceeded your current quota');
+
+      if (isUnavailable || isQuotaExceeded) {
+        console.warn(`[analyze-inspection] ${isQuotaExceeded ? 'Rate limit / Quota exceeded (429)' : 'Model unavailable (404)'} on ${modelName}, switching to next model in list...`);
         continue;
       }
+
+      // Error อื่นๆ (เช่น Invalid API key) หยุดทันที
       console.error(`[analyze-inspection] fatal error with ${modelName}:`, msg);
       return res.status(500).json({ success: false, error: msg });
     }
   }
 
   console.error('[analyze-inspection] all models exhausted');
+  const lastMsg = String(lastError?.message || '');
+  const isAllQuotaExceeded = lastMsg.includes('429') || lastMsg.includes('RESOURCE_EXHAUSTED') || lastMsg.includes('quota');
+
+  if (isAllQuotaExceeded) {
+    return res.status(429).json({
+      success: false,
+      error: 'โควตาการเรียก AI ชั่วคราวเต็ม (จำกัด 5-10 ครั้ง/นาที) กรุณารอสักครู่ (~30 วินาที) แล้วกดลองใหม่อีกครั้ง',
+      isQuotaExceeded: true,
+      retryAfterSeconds: 30,
+    });
+  }
+
   return res.status(500).json({
     success: false,
     error: `ไม่สามารถเชื่อมต่อ Gemini AI ได้ในขณะนี้ กรุณาลองใหม่ภายหลัง (${lastError?.message ?? 'unknown'})`,

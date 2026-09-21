@@ -135,7 +135,17 @@ export function CompanyUploadCard({ report, index, onUpdate, onRemove }: Company
   );
   const [priceNote, setPriceNote] = useState<string>(report.priceNote ?? '');
   const [priceSource, setPriceSource] = useState<'ai' | 'manual' | undefined>(report.priceSource);
+  const [retryCountdown, setRetryCountdown] = useState<number>(0);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // นับถอยหลังเมื่อติด Rate limit เพื่อป้องกันการกดย้ำ
+  useEffect(() => {
+    if (retryCountdown <= 0) return;
+    const timer = setInterval(() => {
+      setRetryCountdown(prev => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [retryCountdown]);
 
   const ACCEPTED_TYPES = [
     'application/pdf',
@@ -247,10 +257,34 @@ export function CompanyUploadCard({ report, index, onUpdate, onRemove }: Company
           priceSource: aiPrice != null ? 'ai' : (priceInput !== '' ? 'manual' : undefined),
         });
       } else {
-        onUpdate({ ...report, company: updatedName, processingStatus: 'error', errorMessage: json.error || 'เกิดข้อผิดพลาด' });
+        const errorMsg = String(json.error || 'เกิดข้อผิดพลาด');
+        const isQuota = json.isQuotaExceeded || errorMsg.includes('429') || errorMsg.includes('RESOURCE_EXHAUSTED') || errorMsg.includes('quota');
+        if (isQuota) {
+          setRetryCountdown(json.retryAfterSeconds || 30);
+        }
+        onUpdate({
+          ...report,
+          company: updatedName,
+          processingStatus: 'error',
+          errorMessage: isQuota
+            ? 'โควตาการเรียก AI ชั่วคราวเต็ม (จำกัด 5 ครั้ง/นาที) กรุณารอสักครู่แล้วกดลองใหม่'
+            : errorMsg,
+        });
       }
     } catch (err: any) {
-      onUpdate({ ...report, company: updatedName, processingStatus: 'error', errorMessage: err.message || 'ไม่สามารถเชื่อมต่อได้' });
+      const errorMsg = String(err.message || 'ไม่สามารถเชื่อมต่อได้');
+      const isQuota = errorMsg.includes('429') || errorMsg.includes('RESOURCE_EXHAUSTED') || errorMsg.includes('quota');
+      if (isQuota) {
+        setRetryCountdown(30);
+      }
+      onUpdate({
+        ...report,
+        company: updatedName,
+        processingStatus: 'error',
+        errorMessage: isQuota
+          ? 'โควตาการเรียก AI ชั่วคราวเต็ม (จำกัด 5 ครั้ง/นาที) กรุณารอสักครู่แล้วกดลองใหม่'
+          : errorMsg,
+      });
     }
   };
 
@@ -464,16 +498,31 @@ export function CompanyUploadCard({ report, index, onUpdate, onRemove }: Company
 
         {status === 'error' && (
           <div className="space-y-2">
-            <div className="flex items-start gap-2 py-2 text-red-600">
-              <AlertCircle size={16} className="shrink-0 mt-0.5" />
-              <span className="text-xs break-words">{report.errorMessage}</span>
+            <div className="flex items-start gap-2 p-2.5 bg-red-50 rounded-xl border border-red-200 text-red-700">
+              <AlertCircle size={15} className="shrink-0 mt-0.5 text-red-500" />
+              <div className="text-xs leading-relaxed">
+                <span className="font-semibold block mb-0.5">เกิดข้อผิดพลาดในการวิเคราะห์</span>
+                <span className="text-slate-600 block">{report.errorMessage}</span>
+                {retryCountdown > 0 && (
+                  <span className="text-amber-700 font-medium block mt-1 text-[11px]">
+                    ⏳ กำลังรอคลายโควตา: อีก {retryCountdown} วินาที
+                  </span>
+                )}
+              </div>
             </div>
             <button
               onClick={handleAnalyze}
-              disabled={files.length === 0 || isSizeError}
-              className="w-full py-2 rounded-xl bg-red-50 text-red-700 text-xs font-semibold hover:bg-red-100 transition-colors border border-red-200 disabled:opacity-40"
+              disabled={files.length === 0 || isSizeError || retryCountdown > 0}
+              className="w-full py-2 rounded-xl bg-red-600 text-white text-xs font-semibold hover:bg-red-700 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
             >
-              ลองใหม่
+              {retryCountdown > 0 ? (
+                <>
+                  <Loader2 size={13} className="animate-spin" />
+                  <span>รออีก {retryCountdown} วินาทีเพื่อลองใหม่</span>
+                </>
+              ) : (
+                <span>ลองใหม่</span>
+              )}
             </button>
           </div>
         )}
