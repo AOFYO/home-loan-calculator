@@ -117,11 +117,18 @@ export function InspectionComparator() {
 
       let success = false;
       let attempt = 0;
-      const MAX_ATTEMPTS = 12; // พยายามซ้ำอัตโนมัติจนกว่าจะสำเร็จ
+      const MAX_ATTEMPTS = 40; // พยายามซ้ำอัตโนมัติต่อเนื่องจนกว่าจะสำเร็จ
 
       while (!success && attempt < MAX_ATTEMPTS && !isCancelledRef.current) {
         attempt++;
-        const currentModelName = 'Gemini 2.5 Flash';
+        // หมุนเวียนโมเดลแสดงใน UI เพื่อให้ผู้ใช้ทราบว่าระบบกำลังสลับโมเดล
+        const currentModelName = attempt === 1
+          ? 'Gemini 2.5 Flash'
+          : attempt % 3 === 0
+          ? 'Gemini 2.0 Flash'
+          : attempt % 2 === 0
+          ? 'Gemini 2.5 Flash-Lite'
+          : 'Gemini 2.0 Flash-Lite';
 
         setReports(prev => prev.map((r, idx) => idx === i ? {
           ...r,
@@ -176,7 +183,7 @@ export function InspectionComparator() {
               ...r,
               company: finalName,
               processingStatus: 'done',
-              currentModel: json.model || 'Gemini 2.5 Flash',
+              currentModel: json.model || currentModelName,
               items: json.items,
               specialItems: json.specialItems || [],
               serviceTerms: json.serviceTerms || undefined,
@@ -192,7 +199,7 @@ export function InspectionComparator() {
               currentIdx: i,
               total,
               currentCompany: finalName,
-              model: json.model || 'Gemini 2.5 Flash',
+              model: json.model || currentModelName,
               stepMessage: `✅ วิเคราะห์ "${finalName}" สำเร็จ! (${json.items.length} รายการ)`,
             });
 
@@ -206,10 +213,11 @@ export function InspectionComparator() {
             }
 
           } else {
-            // เมื่อติด Rate limit หรือ Error
+            // เมื่อติด Rate limit (429), High demand (503) หรือ Error อื่นๆ
             const errorMsg = String(json.error || 'เกิดข้อผิดพลาดในการประมวลผล');
             const isQuota = json.isQuotaExceeded || errorMsg.includes('429') || errorMsg.includes('RESOURCE_EXHAUSTED') || errorMsg.includes('quota');
-            const waitSec = json.retryAfterSeconds || (isQuota ? 20 : 8);
+            const isHighDemand = json.isHighDemand || errorMsg.includes('503') || errorMsg.includes('high demand') || errorMsg.includes('UNAVAILABLE');
+            const waitSec = json.retryAfterSeconds || (isQuota ? 20 : isHighDemand ? 12 : 8);
 
             console.warn(`[Batch] Attempt ${attempt} error for ${companyName}:`, errorMsg);
 
@@ -218,7 +226,9 @@ export function InspectionComparator() {
               processingStatus: 'processing',
               errorMessage: isQuota
                 ? `โควตาชั่วคราวเต็ม — ระบบจะลองใหม่อัตโนมัติในอีก ${waitSec} วินาที...`
-                : `เกิดข้อผิดพลาด — กำลังลองใหม่ในอีก ${waitSec} วินาที...`,
+                : isHighDemand
+                ? `AI กำลังมีผู้ใช้งานหนาแน่นชั่วคราว — จะสลับโมเดลและลองใหม่ในอีก ${waitSec} วินาที...`
+                : `เกิดข้อผิดพลาดชั่วคราว — กำลังลองใหม่ในอีก ${waitSec} วินาที...`,
             } : r));
 
             // นับถอยหลังแบบเรียลไทม์
@@ -228,11 +238,13 @@ export function InspectionComparator() {
                 currentIdx: i,
                 total,
                 currentCompany: companyName,
-                model: 'กำลังรอคลายโควตาและสลับโมเดล...',
+                model: isHighDemand ? 'สลับโมเดลเนื่องจาก High demand...' : 'กำลังรอคลายโควตาและสลับโมเดล...',
                 stepMessage: isQuota
                   ? `⏳ โควตา API ชั่วคราวเต็ม — กำลังรออีก ${s} วินาที แล้วจะลองใหม่อัตโนมัติ (ครั้งที่ ${attempt})...`
+                  : isHighDemand
+                  ? `⏳ โมเดล AI มีผู้ใช้งานหนาแน่นชั่วคราว (High demand) — กำลังรออีก ${s} วินาที แล้วจะสลับโมเดลลองใหม่อัตโนมัติ (ครั้งที่ ${attempt})...`
                   : `⚠️ เชื่อมต่อขัดข้อง — กำลังรอ ${s} วินาที แล้วจะลองใหม่อัตโนมัติ (ครั้งที่ ${attempt})...`,
-                isRateLimited: isQuota,
+                isRateLimited: isQuota || isHighDemand,
                 retryCountdown: s,
               });
               await new Promise(r => setTimeout(r, 1000));
@@ -241,12 +253,15 @@ export function InspectionComparator() {
         } catch (err: any) {
           const errMsg = String(err.message || err);
           const isQuota = errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED') || errMsg.includes('quota');
-          const waitSec = isQuota ? 25 : 6;
+          const isHighDemand = errMsg.includes('503') || errMsg.includes('high demand') || errMsg.includes('UNAVAILABLE');
+          const waitSec = isQuota ? 20 : isHighDemand ? 12 : 6;
 
           setReports(prev => prev.map((r, idx) => idx === i ? {
             ...r,
             processingStatus: 'processing',
-            errorMessage: `เชื่อมต่อไม่สำเร็จ — จะลองใหม่อัตโนมัติใน ${waitSec} วินาที...`,
+            errorMessage: isHighDemand
+              ? `AI หนาแน่นชั่วคราว — จะลองใหม่ใน ${waitSec} วินาที...`
+              : `เชื่อมต่อไม่สำเร็จ — จะลองใหม่อัตโนมัติใน ${waitSec} วินาที...`,
           } : r));
 
           for (let s = waitSec; s > 0; s--) {
@@ -256,7 +271,9 @@ export function InspectionComparator() {
               total,
               currentCompany: companyName,
               model: 'กำลังรอการเชื่อมต่อใหม่...',
-              stepMessage: `⏳ กำลังรอ ${s} วินาที แล้วจะลองวิเคราะห์ "${companyName}" ใหม่อัตโนมัติ...`,
+              stepMessage: isHighDemand
+                ? `⏳ AI มีผู้ใช้งานหนาแน่นชั่วคราว — กำลังรอ ${s} วินาที แล้วจะลองใหม่อัตโนมัติ...`
+                : `⏳ กำลังรอ ${s} วินาที แล้วจะลองวิเคราะห์ "${companyName}" ใหม่อัตโนมัติ...`,
               retryCountdown: s,
             });
             await new Promise(r => setTimeout(r, 1000));
@@ -268,7 +285,7 @@ export function InspectionComparator() {
         setReports(prev => prev.map((r, idx) => idx === i ? {
           ...r,
           processingStatus: 'error',
-          errorMessage: 'ไม่สามารถวิเคราะห์ได้หลังพยายามหลายครั้ง กรุณาลองใหม่อีกครั้ง',
+          errorMessage: 'ไม่สามารถวิเคราะห์ได้หลังพยายามหลายครั้ง กรุณากดปุ่มลองใหม่อีกครั้ง',
         } : r));
       }
     }

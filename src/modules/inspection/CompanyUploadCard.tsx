@@ -291,8 +291,9 @@ export function CompanyUploadCard({ report, index, onUpdate, onRemove, disabled 
       } else {
         const errorMsg = String(json.error || 'เกิดข้อผิดพลาด');
         const isQuota = json.isQuotaExceeded || errorMsg.includes('429') || errorMsg.includes('RESOURCE_EXHAUSTED') || errorMsg.includes('quota');
-        if (isQuota) {
-          setRetryCountdown(json.retryAfterSeconds || 30);
+        const isHighDemand = json.isHighDemand || errorMsg.includes('503') || errorMsg.includes('high demand') || errorMsg.includes('UNAVAILABLE');
+        if (isQuota || isHighDemand) {
+          setRetryCountdown(json.retryAfterSeconds || (isHighDemand ? 12 : 30));
         }
         onUpdate({
           ...report,
@@ -300,14 +301,17 @@ export function CompanyUploadCard({ report, index, onUpdate, onRemove, disabled 
           processingStatus: 'error',
           errorMessage: isQuota
             ? 'โควตาการเรียก AI ชั่วคราวเต็ม (จำกัด 5 ครั้ง/นาที) กรุณารอสักครู่แล้วกดลองใหม่'
+            : isHighDemand
+            ? 'AI มีผู้ใช้งานหนาแน่นชั่วคราว (High demand) กรุณารอสักครู่แล้วระบบจะลองใหม่'
             : errorMsg,
         });
       }
     } catch (err: any) {
       const errorMsg = String(err.message || 'ไม่สามารถเชื่อมต่อได้');
       const isQuota = errorMsg.includes('429') || errorMsg.includes('RESOURCE_EXHAUSTED') || errorMsg.includes('quota');
-      if (isQuota) {
-        setRetryCountdown(30);
+      const isHighDemand = errorMsg.includes('503') || errorMsg.includes('high demand') || errorMsg.includes('UNAVAILABLE');
+      if (isQuota || isHighDemand) {
+        setRetryCountdown(isHighDemand ? 12 : 30);
       }
       onUpdate({
         ...report,
@@ -315,6 +319,8 @@ export function CompanyUploadCard({ report, index, onUpdate, onRemove, disabled 
         processingStatus: 'error',
         errorMessage: isQuota
           ? 'โควตาการเรียก AI ชั่วคราวเต็ม (จำกัด 5 ครั้ง/นาที) กรุณารอสักครู่แล้วกดลองใหม่'
+          : isHighDemand
+          ? 'AI มีผู้ใช้งานหนาแน่นชั่วคราว (High demand) กรุณารอสักครู่แล้วระบบจะลองใหม่'
           : errorMsg,
       });
     }

@@ -102,8 +102,8 @@ ${STANDARD_ITEMS_CONTEXT}
 const MODEL_FALLBACK_LIST = [
   'gemini-2.5-flash',
   'gemini-2.5-flash-lite',
-  'gemini-3.6-flash',
-  'gemini-1.5-flash',
+  'gemini-2.0-flash',
+  'gemini-2.0-flash-lite',
 ];
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -233,36 +233,49 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.warn(`[analyze-inspection] error with ${modelName}:`, msg);
       lastError = err;
 
-      // ตรวจสอบทั้ง 404 (ไม่พบโมเดล) และ 429 (โควตา/Rate Limit เต็ม)
-      const isUnavailable = msg.includes('404') || msg.includes('NOT_FOUND') || msg.includes('no longer available') || msg.includes('not found');
-      const isQuotaExceeded = msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota') || msg.includes('exceeded your current quota');
-
-      if (isUnavailable || isQuotaExceeded) {
-        console.warn(`[analyze-inspection] ${isQuotaExceeded ? 'Rate limit / Quota exceeded (429)' : 'Model unavailable (404)'} on ${modelName}, switching to next model in list...`);
-        continue;
+      // ตรวจสอบข้อผิดพลาดระดับสิทธิ์เข้าถึง (Auth) เท่านั้นที่ต้องหยุดทันที
+      const isFatalAuth = msg.includes('API_KEY_INVALID') || msg.includes('PERMISSION_DENIED') || msg.includes('API key not valid');
+      if (isFatalAuth) {
+        console.error(`[analyze-inspection] fatal auth error with ${modelName}:`, msg);
+        return res.status(401).json({ success: false, error: 'GEMINI_API_KEY ไม่ถูกต้องหรือไม่มีสิทธิ์เข้าถึง' });
       }
 
-      // Error อื่นๆ (เช่น Invalid API key) หยุดทันที
-      console.error(`[analyze-inspection] fatal error with ${modelName}:`, msg);
-      return res.status(500).json({ success: false, error: msg });
+      // สำหรับข้อผิดพลาดอื่นๆ ทั้งหมด เช่น:
+      // 1) 503 UNAVAILABLE / high demand / spikes in demand
+      // 2) 429 RESOURCE_EXHAUSTED / quota / rate limit
+      // 3) 404 NOT_FOUND / not supported for generateContent
+      // 4) 500 / 502 / 504 / INTERNAL / timeout
+      // ให้สลับไปลองโมเดลถัดไปใน MODEL_FALLBACK_LIST ทันที!
+      console.warn(`[analyze-inspection] model ${modelName} encountered transient error, switching to next fallback model...`);
+      continue;
     }
   }
 
-  console.error('[analyze-inspection] all models exhausted');
+  console.error('[analyze-inspection] all models in fallback list failed');
   const lastMsg = String(lastError?.message || '');
   const isAllQuotaExceeded = lastMsg.includes('429') || lastMsg.includes('RESOURCE_EXHAUSTED') || lastMsg.includes('quota');
+  const isAllHighDemand = lastMsg.includes('503') || lastMsg.includes('UNAVAILABLE') || lastMsg.includes('high demand') || lastMsg.includes('demand');
+
+  if (isAllHighDemand) {
+    return res.status(503).json({
+      success: false,
+      error: 'โมเดล AI ของ Google กำลังมีผู้ใช้งานหนาแน่นชั่วคราว (High demand) กรุณารอสักครู่ (~12 วินาที) ระบบจะลองใหม่อัตโนมัติ',
+      isHighDemand: true,
+      retryAfterSeconds: 12,
+    });
+  }
 
   if (isAllQuotaExceeded) {
     return res.status(429).json({
       success: false,
-      error: 'โควตาการเรียก AI ชั่วคราวเต็ม (จำกัด 5-10 ครั้ง/นาที) กรุณารอสักครู่ (~30 วินาที) แล้วกดลองใหม่อีกครั้ง',
+      error: 'โควตาการเรียก AI ชั่วคราวเต็ม (จำกัด 5-10 ครั้ง/นาที) กรุณารอสักครู่ (~20 วินาที) แล้วระบบจะลองใหม่',
       isQuotaExceeded: true,
-      retryAfterSeconds: 30,
+      retryAfterSeconds: 20,
     });
   }
 
   return res.status(500).json({
     success: false,
-    error: `ไม่สามารถเชื่อมต่อ Gemini AI ได้ในขณะนี้ กรุณาลองใหม่ภายหลัง (${lastError?.message ?? 'unknown'})`,
+    error: `ไม่สามารถเชื่อมต่อ Gemini AI ได้ในขณะนี้ (${lastError?.message ?? 'unknown'})`,
   });
 }
