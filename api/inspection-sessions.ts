@@ -29,7 +29,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   if (!redis) {
-    return res.status(503).json({ success: false, error: 'Redis ไม่ได้ตั้งค่า' });
+    // Redis ไม่ได้ตั้งค่า — ส่ง empty sessions กลับไปพร้อม warning
+    // GET → sessions ว่าง, POST/DELETE → no-op
+    if (req.method === 'GET') {
+      return res.status(200).json({
+        success: true,
+        sessions: [],
+        warning: 'Redis ไม่ได้ตั้งค่า — ประวัติจะไม่ถูกบันทึก กรุณาเพิ่ม UPSTASH_REDIS_REST_URL และ UPSTASH_REDIS_REST_TOKEN ใน Vercel',
+      });
+    }
+    return res.status(200).json({
+      success: false,
+      error: 'Redis ไม่ได้ตั้งค่า — ไม่สามารถบันทึกประวัติได้ กรุณาเพิ่ม UPSTASH_REDIS_REST_URL และ UPSTASH_REDIS_REST_TOKEN ใน Vercel Environment Variables',
+    });
   }
 
   // =============== GET: รายการ sessions ===============

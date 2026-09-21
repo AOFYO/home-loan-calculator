@@ -10,6 +10,7 @@ export function SessionList({ onLoad }: SessionListProps) {
   const [sessions, setSessions] = useState<ComparisonSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [redisWarning, setRedisWarning] = useState<string | null>(null);
 
   const fetchSessions = async () => {
     setLoading(true);
@@ -18,6 +19,7 @@ export function SessionList({ onLoad }: SessionListProps) {
       const json = await res.json();
       if (json.success) {
         setSessions(json.sessions || []);
+        if (json.warning) setRedisWarning(json.warning);
       } else {
         setError(json.error || 'ไม่สามารถโหลด session ได้');
       }
@@ -60,10 +62,47 @@ export function SessionList({ onLoad }: SessionListProps) {
 
   if (sessions.length === 0) {
     return (
-      <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
-        <FolderOpen size={36} className="text-slate-300 mx-auto mb-3" />
-        <p className="text-slate-500 font-medium">ยังไม่มีประวัติการเปรียบเทียบ</p>
-        <p className="text-slate-400 text-sm mt-1">เมื่อวิเคราะห์และบันทึกแล้ว จะแสดงที่นี่</p>
+      <div className="space-y-4">
+        {/* Redis not configured warning */}
+        {redisWarning && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 shadow-sm">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl shrink-0">⚠️</span>
+              <div className="flex-1">
+                <p className="font-semibold text-amber-800 mb-1">ระบบประวัติยังไม่พร้อมใช้งาน</p>
+                <p className="text-sm text-amber-700 mb-3">
+                  ต้องตั้งค่า Upstash Redis ใน Vercel เพื่อใช้ฟีเจอร์บันทึกประวัติ
+                </p>
+                <div className="bg-white rounded-xl border border-amber-200 p-4 space-y-2 text-sm">
+                  <p className="font-semibold text-slate-700">วิธีตั้งค่า:</p>
+                  <ol className="list-decimal list-inside space-y-1.5 text-slate-600">
+                    <li>ไปที่ <a href="https://upstash.com" target="_blank" rel="noreferrer" className="text-blue-600 underline">upstash.com</a> → สร้าง Redis database ฟรี</li>
+                    <li>คัดลอก <code className="bg-slate-100 px-1 rounded text-xs">REST URL</code> และ <code className="bg-slate-100 px-1 rounded text-xs">REST Token</code></li>
+                    <li>ไปที่ Vercel → Project Settings → Environment Variables</li>
+                    <li>เพิ่ม 2 variables:
+                      <div className="mt-1 ml-4 space-y-1">
+                        <div className="bg-slate-50 rounded px-2 py-1 font-mono text-xs">UPSTASH_REDIS_REST_URL = &lt;REST URL&gt;</div>
+                        <div className="bg-slate-50 rounded px-2 py-1 font-mono text-xs">UPSTASH_REDIS_REST_TOKEN = &lt;REST Token&gt;</div>
+                      </div>
+                    </li>
+                    <li>Redeploy แล้วกลับมาลองใหม่</li>
+                  </ol>
+                </div>
+                <p className="text-xs text-amber-600 mt-2">
+                  💡 ฟีเจอร์อัปโหลดและเปรียบเทียบยังใช้งานได้ปกติ — เพียงแต่ประวัติจะไม่ถูกบันทึก
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!redisWarning && (
+          <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
+            <FolderOpen size={36} className="text-slate-300 mx-auto mb-3" />
+            <p className="text-slate-500 font-medium">ยังไม่มีประวัติการเปรียบเทียบ</p>
+            <p className="text-slate-400 text-sm mt-1">เมื่อวิเคราะห์และบันทึกแล้ว จะแสดงที่นี่</p>
+          </div>
+        )}
       </div>
     );
   }
