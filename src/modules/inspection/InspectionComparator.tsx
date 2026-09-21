@@ -121,18 +121,16 @@ export function InspectionComparator() {
 
       while (!success && attempt < MAX_ATTEMPTS && !isCancelledRef.current) {
         attempt++;
-        // หมุนเวียนโมเดลเฉพาะตระกูล Gemini 3.x Flash
-        const currentModelName = attempt === 1
-          ? 'Gemini 3.5 Flash'
-          : attempt % 5 === 0
-          ? 'Gemini 3.8 Flash'
-          : attempt % 4 === 0
-          ? 'Gemini 3.7 Flash'
-          : attempt % 3 === 0
-          ? 'Gemini 3.6 Flash'
-          : attempt % 2 === 0
-          ? 'Gemini 3.5 Flash-Lite'
-          : 'Gemini 3.1 Flash-Lite';
+        // หมุนเวียนโมเดลเฉพาะตระกูล Gemini 3.x Flash โดยเรียงจากเวอร์ชันล่าสุดก่อน
+        const flashModels = [
+          'Gemini 3.8 Flash',
+          'Gemini 3.7 Flash',
+          'Gemini 3.6 Flash',
+          'Gemini 3.5 Flash',
+          'Gemini 3.5 Flash-Lite',
+          'Gemini 3.1 Flash-Lite',
+        ];
+        const currentModelName = flashModels[(attempt - 1) % flashModels.length];
 
         setReports(prev => prev.map((r, idx) => idx === i ? {
           ...r,
@@ -622,7 +620,7 @@ export function InspectionComparator() {
                   )}
                 </p>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  ระบบจะสลับโมเดลอัตโนมัติเฉพาะตระกูล Gemini 3.x Flash (3.5 / 3.5-Lite / 3.7 / 3.6 / 3.8 / 3.1-Lite) และลองใหม่จนกว่าจะสำเร็จครบทุกบริษัท
+                  ระบบจะสลับโมเดลอัตโนมัติเฉพาะตระกูล Gemini 3.x Flash เรียงจากเวอร์ชันล่าสุดก่อน (3.8 → 3.7 → 3.6 → 3.5 → 3.5-Lite → 3.1-Lite) และลองใหม่จนกว่าจะสำเร็จครบทุกบริษัท
                 </p>
               </div>
 
