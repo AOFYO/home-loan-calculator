@@ -41,6 +41,14 @@ export interface ServiceTerms {
   specialNotes?: string;
 }
 
+export interface UploadedFileItem {
+  name: string;
+  type: string;
+  base64: string;
+  size: number;          // ขนาดหลัง compress (bytes)
+  originalSize: number;  // ขนาดก่อน compress
+}
+
 export interface CompanyReport {
   /** Unique ID ของรายงานนี้ */
   id: string;
@@ -56,8 +64,14 @@ export interface CompanyReport {
   serviceTerms?: ServiceTerms;
   /** ชื่อไฟล์ต้นฉบับที่ upload */
   sourceFiles: string[];
+  /** รายการไฟล์ที่แนบไว้สำหรับการวิเคราะห์ */
+  files?: UploadedFileItem[];
   /** สถานะการประมวลผล AI */
-  processingStatus: 'idle' | 'processing' | 'done' | 'error';
+  processingStatus: 'idle' | 'queued' | 'processing' | 'done' | 'error';
+  /** โมเดล Gemini ที่กำลังวิเคราะห์ หรือวิเคราะห์สำเร็จ */
+  currentModel?: string;
+  /** จำนวนครั้งที่พยายามลองใหม่ */
+  retryCount?: number;
   /** ข้อความ error (ถ้ามี) */
   errorMessage?: string;
 

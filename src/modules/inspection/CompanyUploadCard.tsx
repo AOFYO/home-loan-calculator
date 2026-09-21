@@ -7,6 +7,7 @@ interface CompanyUploadCardProps {
   index: number;
   onUpdate: (report: CompanyReport) => void;
   onRemove?: () => void;
+  disabled?: boolean;
 }
 
 interface FileItem {
@@ -123,10 +124,10 @@ function totalBase64Size(items: FileItem[]): number {
 // ===============================================================
 // Component
 // ===============================================================
-export function CompanyUploadCard({ report, index, onUpdate, onRemove }: CompanyUploadCardProps) {
+export function CompanyUploadCard({ report, index, onUpdate, onRemove, disabled = false }: CompanyUploadCardProps) {
   const color = COMPANY_COLORS[index % COMPANY_COLORS.length];
   const [companyName, setCompanyName] = useState(report.company);
-  const [files, setFiles] = useState<FileItem[]>([]);
+  const [files, setFiles] = useState<FileItem[]>(report.files || []);
   const [isDragging, setIsDragging] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
   // ========== ราคา ==========
@@ -137,6 +138,27 @@ export function CompanyUploadCard({ report, index, onUpdate, onRemove }: Company
   const [priceSource, setPriceSource] = useState<'ai' | 'manual' | undefined>(report.priceSource);
   const [retryCountdown, setRetryCountdown] = useState<number>(0);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Sync กับ report เมื่อมีการเปลี่ยนแปลงจากภายนอก (เช่น Batch Engine / Session load)
+  useEffect(() => {
+    setCompanyName(report.company);
+  }, [report.company]);
+
+  useEffect(() => {
+    if (report.files) {
+      setFiles(report.files);
+    }
+  }, [report.files]);
+
+  useEffect(() => {
+    if (report.price != null) {
+      setPriceInput(String(report.price));
+    } else if (report.price === null) {
+      setPriceInput('');
+    }
+    setPriceNote(report.priceNote ?? '');
+    setPriceSource(report.priceSource);
+  }, [report.price, report.priceNote, report.priceSource]);
 
   // นับถอยหลังเมื่อติด Rate limit เพื่อป้องกันการกดย้ำ
   useEffect(() => {
@@ -161,11 +183,15 @@ export function CompanyUploadCard({ report, index, onUpdate, onRemove }: Company
     setIsConverting(true);
     try {
       const converted = await Promise.all(valid.map(fileToBase64Item));
-      setFiles(prev => [...prev, ...converted]);
+      setFiles(prev => {
+        const next = [...prev, ...converted];
+        onUpdate({ ...report, files: next });
+        return next;
+      });
     } finally {
       setIsConverting(false);
     }
-  }, []);
+  }, [onUpdate, report]);
 
   const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
@@ -180,7 +206,13 @@ export function CompanyUploadCard({ report, index, onUpdate, onRemove }: Company
     }
   }, [processFiles]);
 
-  const removeFile = (idx: number) => setFiles(prev => prev.filter((_, i) => i !== idx));
+  const removeFile = (idx: number) => {
+    setFiles(prev => {
+      const next = prev.filter((_, i) => i !== idx);
+      onUpdate({ ...report, files: next });
+      return next;
+    });
+  };
 
   // sync price state → report เมื่อ user แก้ไขเอง
   const handlePriceBlur = () => {
@@ -303,12 +335,26 @@ export function CompanyUploadCard({ report, index, onUpdate, onRemove }: Company
         <input
           type="text"
           value={companyName}
-          onChange={e => setCompanyName(e.target.value)}
+          onChange={e => {
+            setCompanyName(e.target.value);
+            onUpdate({ ...report, company: e.target.value });
+          }}
+          onBlur={() => {
+            const trimmed = companyName.trim();
+            if (trimmed && trimmed !== report.company) {
+              onUpdate({ ...report, company: trimmed });
+            }
+          }}
+          disabled={disabled || status === 'processing'}
           placeholder="ชื่อบริษัทตรวจบ้าน"
-          className={`flex-1 text-sm font-semibold bg-transparent border-none outline-none ${color.text} placeholder:text-slate-400`}
+          className={`flex-1 text-sm font-semibold bg-transparent border-none outline-none ${color.text} placeholder:text-slate-400 disabled:opacity-60`}
         />
         {onRemove && (
-          <button onClick={onRemove} className="p-1 rounded-md hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors">
+          <button
+            onClick={onRemove}
+            disabled={disabled || status === 'processing'}
+            className="p-1 rounded-md hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors disabled:opacity-30"
+          >
             <X size={14} />
           </button>
         )}
@@ -319,12 +365,12 @@ export function CompanyUploadCard({ report, index, onUpdate, onRemove }: Company
         className={`
           m-3 rounded-xl border-2 border-dashed transition-all duration-200 cursor-pointer
           ${isDragging ? 'border-violet-400 bg-violet-50' : 'border-slate-300 bg-white/50 hover:border-slate-400'}
-          ${(status === 'processing' || isConverting) ? 'pointer-events-none opacity-60' : ''}
+          ${(disabled || status === 'processing' || isConverting) ? 'pointer-events-none opacity-60' : ''}
         `}
-        onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
+        onDragOver={e => { e.preventDefault(); if (!disabled) setIsDragging(true); }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
-        onClick={() => inputRef.current?.click()}
+        onClick={() => { if (!disabled) inputRef.current?.click(); }}
       >
         <input
           ref={inputRef}
@@ -373,7 +419,7 @@ export function CompanyUploadCard({ report, index, onUpdate, onRemove }: Company
                 </div>
                 <button
                   onClick={() => removeFile(idx)}
-                  disabled={status === 'processing'}
+                  disabled={disabled || status === 'processing'}
                   className="p-0.5 rounded hover:bg-red-100 text-slate-400 hover:text-red-500 transition-colors disabled:opacity-30"
                 >
                   <X size={12} />
@@ -441,7 +487,7 @@ export function CompanyUploadCard({ report, index, onUpdate, onRemove }: Company
                 if (priceSource !== 'ai') setPriceSource('manual');
               }}
               onBlur={handlePriceBlur}
-              disabled={status === 'processing'}
+              disabled={disabled || status === 'processing'}
               className="w-full pl-3 pr-10 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-400 bg-white disabled:opacity-50"
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">฿</span>
@@ -459,7 +505,7 @@ export function CompanyUploadCard({ report, index, onUpdate, onRemove }: Company
           value={priceNote}
           onChange={e => setPriceNote(e.target.value)}
           onBlur={handlePriceBlur}
-          disabled={status === 'processing'}
+          disabled={disabled || status === 'processing'}
           className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-400 bg-white disabled:opacity-50 text-slate-600 placeholder:text-slate-300"
         />
       </div>
@@ -467,29 +513,55 @@ export function CompanyUploadCard({ report, index, onUpdate, onRemove }: Company
       {/* Status + Action */}
       <div className="px-3 pb-3">
         {status === 'idle' && files.length > 0 && (
-          <button
-            onClick={handleAnalyze}
-            disabled={isSizeError || isConverting}
-            className="w-full py-2 rounded-xl bg-violet-600 text-white text-xs font-semibold hover:bg-violet-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            🤖 ให้ AI วิเคราะห์ ({files.length} ไฟล์)
-          </button>
+          <div className="flex items-center justify-between py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 text-xs">
+            <span className="text-emerald-700 font-medium flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+              พร้อมวิเคราะห์ ({files.length} ไฟล์)
+            </span>
+            <button
+              onClick={handleAnalyze}
+              disabled={disabled || isSizeError || isConverting}
+              className="text-[11px] text-violet-600 hover:text-violet-800 font-semibold underline disabled:opacity-40 disabled:cursor-not-allowed"
+              title="วิเคราะห์เฉพาะบริษัทนี้"
+            >
+              วิเคราะห์เดี่ยว
+            </button>
+          </div>
+        )}
+
+        {status === 'queued' && (
+          <div className="flex items-center justify-center gap-2 py-2.5 px-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs">
+            <Loader2 size={14} className="animate-spin text-amber-600" />
+            <span className="font-semibold">⏳ รอคิววิเคราะห์...</span>
+          </div>
         )}
 
         {status === 'processing' && (
-          <div className="flex items-center justify-center gap-2 py-2 text-violet-600">
-            <Loader2 size={16} className="animate-spin" />
-            <span className="text-xs font-medium">AI กำลังอ่านเอกสาร...</span>
+          <div className="flex flex-col items-center justify-center gap-1 py-2.5 px-3 bg-violet-50 border border-violet-200 rounded-xl text-violet-800 text-xs">
+            <div className="flex items-center gap-2">
+              <Loader2 size={15} className="animate-spin text-violet-600" />
+              <span className="font-semibold">AI กำลังวิเคราะห์เอกสาร...</span>
+            </div>
+            <span className="text-[11px] text-violet-600 font-mono">
+              โมเดล: {report.currentModel || 'Gemini 2.5 Flash'}
+            </span>
           </div>
         )}
 
         {status === 'done' && (
-          <div className="flex items-center gap-2 py-2 text-emerald-600">
-            <CheckCircle2 size={16} />
-            <span className="text-xs font-medium">วิเคราะห์แล้ว — {report.items.length} รายการ</span>
+          <div className="flex items-center justify-between py-2 px-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs">
+            <div className="flex items-center gap-1.5">
+              <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
+              <div>
+                <span className="font-semibold block">วิเคราะห์สำเร็จ ({report.items.length} รายการ)</span>
+                {report.currentModel && (
+                  <span className="text-[10px] text-emerald-600 block font-mono">โมเดล: {report.currentModel}</span>
+                )}
+              </div>
+            </div>
             <button
-              onClick={() => { onUpdate({ ...report, processingStatus: 'idle', items: [] }); setFiles([]); }}
-              className="ml-auto text-[10px] text-slate-400 hover:text-slate-600 underline"
+              onClick={() => { onUpdate({ ...report, processingStatus: 'idle', items: [], specialItems: [] }); }}
+              className="text-[10px] text-slate-400 hover:text-slate-600 underline shrink-0"
             >
               รีเซ็ต
             </button>
