@@ -7,32 +7,45 @@ interface ComparisonTableProps {
   sessionName: string;
 }
 
-const STATUS_CONFIG: Record<InspectionStatus, {
+const STATUS_CONFIG: Record<string, {
   label: string;
   color: string;
   bgColor: string;
   icon: React.ReactNode;
 }> = {
+  included: {
+    label: 'รวมในรายการ',
+    color: 'text-emerald-700',
+    bgColor: 'bg-emerald-50',
+    icon: <CheckCircle2 size={14} className="text-emerald-500" />,
+  },
+  not_included: {
+    label: 'ไม่รวม',
+    color: 'text-slate-500',
+    bgColor: 'bg-slate-50',
+    icon: <MinusCircle size={14} className="text-slate-400" />,
+  },
+  // backward compat
   ok: {
-    label: 'ปกติ',
+    label: 'รวมในรายการ',
     color: 'text-emerald-700',
     bgColor: 'bg-emerald-50',
     icon: <CheckCircle2 size={14} className="text-emerald-500" />,
   },
   warning: {
-    label: 'ระวัง',
+    label: 'รวม (มีเงื่อนไข)',
     color: 'text-amber-700',
     bgColor: 'bg-amber-50',
     icon: <AlertTriangle size={14} className="text-amber-500" />,
   },
   critical: {
-    label: 'ปัญหา',
+    label: 'รวม (สำคัญ)',
     color: 'text-red-700',
     bgColor: 'bg-red-50',
     icon: <XCircle size={14} className="text-red-500" />,
   },
   not_checked: {
-    label: 'ไม่ได้ตรวจ',
+    label: 'ไม่ระบุ',
     color: 'text-slate-500',
     bgColor: 'bg-slate-50',
     icon: <MinusCircle size={14} className="text-slate-400" />,
@@ -122,10 +135,10 @@ export function ComparisonTable({ reports, sessionName }: ComparisonTableProps) 
           onChange={e => setFilterSeverity(e.target.value)}
           className="text-xs border border-slate-200 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-violet-400"
         >
-          <option value="all">ทุกระดับ</option>
-          <option value="high">🔴 ปัญหาร้ายแรง</option>
-          <option value="medium">🟡 ระดับกลาง</option>
-          <option value="low">🟢 ระดับต่ำ</option>
+          <option value="all">ทุกระดับความสำคัญ</option>
+          <option value="high">🔴 สำคัญมาก (โครงสร้าง/ระบบหลัก)</option>
+          <option value="medium">🟡 สำคัญปานกลาง</option>
+          <option value="low">🟢 รายละเอียด</option>
         </select>
 
         <div className="ml-auto flex items-center gap-2">
@@ -145,19 +158,61 @@ export function ComparisonTable({ reports, sessionName }: ComparisonTableProps) 
         </div>
       </div>
 
-      {/* Summary badges */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {reports.map(report => {
-          const critical = report.items.filter(i => i.status === 'critical').length;
-          const warning = report.items.filter(i => i.status === 'warning').length;
-          const ok = report.items.filter(i => i.status === 'ok').length;
+      {/* Summary cards — ราคา + ความครอบคลุม */}
+      <div className={`grid gap-3 ${reports.length <= 2 ? 'grid-cols-2' : reports.length === 3 ? 'grid-cols-3' : 'grid-cols-2 sm:grid-cols-4'}`}>
+        {reports.map((report, idx) => {
+          const totalTopics = Object.values(topicMap).reduce((sum, t) => sum + t.length, 0);
+          const covered = report.items.filter(i => i.status === 'included' || i.status === 'ok').length;
+          const coveragePct = totalTopics > 0 ? Math.round((covered / totalTopics) * 100) : 0;
+          const pricePerTopic = report.price && covered > 0
+            ? Math.round(report.price / covered)
+            : null;
+
+          const BADGE_COLORS = ['border-blue-200 bg-blue-50', 'border-emerald-200 bg-emerald-50', 'border-amber-200 bg-amber-50', 'border-rose-200 bg-rose-50', 'border-violet-200 bg-violet-50'];
+          const TEXT_COLORS = ['text-blue-700', 'text-emerald-700', 'text-amber-700', 'text-rose-700', 'text-violet-700'];
+
           return (
-            <div key={report.id} className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm">
-              <p className="text-xs font-semibold text-slate-700 truncate mb-2">{report.company}</p>
-              <div className="flex gap-2 text-xs">
-                <span className="text-red-600 font-bold">🔴 {critical}</span>
-                <span className="text-amber-600 font-bold">🟡 {warning}</span>
-                <span className="text-emerald-600 font-bold">🟢 {ok}</span>
+            <div key={report.id} className={`rounded-xl border-2 ${BADGE_COLORS[idx % 5]} p-3 shadow-sm`}>
+              <p className={`text-xs font-bold truncate mb-2 ${TEXT_COLORS[idx % 5]}`}>{report.company}</p>
+
+              {/* ราคา */}
+              <div className="mb-2">
+                {report.price != null ? (
+                  <div>
+                    <div className="text-base font-bold text-slate-800">
+                      ฿{report.price.toLocaleString('th-TH')}
+                    </div>
+                    {report.priceNote && (
+                      <div className="text-[10px] text-slate-500 mt-0.5">{report.priceNote}</div>
+                    )}
+                    {pricePerTopic && (
+                      <div className="text-[10px] text-slate-500">
+                        ≈ ฿{pricePerTopic.toLocaleString('th-TH')} / หัวข้อ
+                      </div>
+                    )}
+                    <div className={`text-[10px] mt-0.5 ${report.priceSource === 'ai' ? 'text-violet-500' : 'text-slate-400'}`}>
+                      {report.priceSource === 'ai' ? '🤖 AI สกัดอัตโนมัติ' : '✏️ กรอกเอง'}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-xs text-slate-400 italic">ไม่ระบุราคา</div>
+                )}
+              </div>
+
+              {/* Coverage */}
+              <div className="space-y-1">
+                <div className="flex justify-between text-[10px]">
+                  <span className="text-slate-500">ครอบคลุม</span>
+                  <span className={`font-bold ${coveragePct >= 80 ? 'text-emerald-600' : coveragePct >= 50 ? 'text-amber-600' : 'text-red-500'}`}>
+                    {covered}/{totalTopics} หัวข้อ ({coveragePct}%)
+                  </span>
+                </div>
+                <div className="h-1.5 bg-white rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${coveragePct >= 80 ? 'bg-emerald-400' : coveragePct >= 50 ? 'bg-amber-400' : 'bg-red-400'}`}
+                    style={{ width: `${coveragePct}%` }}
+                  />
+                </div>
               </div>
             </div>
           );

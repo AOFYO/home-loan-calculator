@@ -2,30 +2,37 @@
 // Home Inspection Comparator — Type Definitions
 // ============================================================
 
-export type InspectionStatus = 'ok' | 'warning' | 'critical' | 'not_checked';
+/**
+ * ระดับความครอบคลุมของรายการตรวจในใบเสนอราคา
+ * (ปรับ use case ให้ถูกต้อง: เอกสารเป็น "ใบเสนอราคา/รายการตรวจ" ไม่ใช่ผลตรวจจริง)
+ */
+export type InspectionCoverage = 'included' | 'not_included';
 export type Severity = 'low' | 'medium' | 'high';
+
+// เก็บ alias เดิมไว้สำหรับ backward compat
+export type InspectionStatus = InspectionCoverage;
 
 export interface InspectionItem {
   /** หมวดหมู่หลัก (AI สร้างจากเอกสาร เช่น "โครงสร้าง", "ระบบไฟฟ้า") */
   category: string;
   /** หัวข้อย่อย (เช่น "เสาและคาน", "วงจรไฟฟ้า") */
   topic: string;
-  /** สถานะที่พบ */
-  status: InspectionStatus;
-  /** รายละเอียดที่ AI สกัดได้ */
+  /** บริษัทนี้รวมหัวข้อนี้ในการตรวจหรือไม่ */
+  status: InspectionCoverage;
+  /** รายละเอียดเพิ่มเติม เช่น วิธีการตรวจ เครื่องมือที่ใช้ */
   detail: string;
-  /** ระดับความรุนแรง */
+  /** ความสำคัญของหัวข้อนี้ (AI ประเมิน) */
   severity: Severity;
 }
 
 export interface CompanyReport {
   /** Unique ID ของรายงานนี้ */
   id: string;
-  /** ชื่อบริษัทตรวจบ้าน */
+  /** ชื่อบริษัทตรวจบ้าน (AI สกัดอัตโนมัติ หรือผู้ใช้กรอก) */
   company: string;
   /** วันที่ upload */
   uploadedAt: string;
-  /** รายการผลตรวจทั้งหมด */
+  /** รายการหัวข้อตรวจทั้งหมด */
   items: InspectionItem[];
   /** ชื่อไฟล์ต้นฉบับที่ upload */
   sourceFiles: string[];
@@ -33,6 +40,14 @@ export interface CompanyReport {
   processingStatus: 'idle' | 'processing' | 'done' | 'error';
   /** ข้อความ error (ถ้ามี) */
   errorMessage?: string;
+
+  // ========== ข้อมูลราคา ==========
+  /** ราคาที่บริษัทเสนอ (บาท) — null ถ้ายังไม่ระบุ */
+  price?: number | null;
+  /** แหล่งที่มาของราคา */
+  priceSource?: 'ai' | 'manual';
+  /** หมายเหตุราคา เช่น "รวม VAT", "ต่อจุด", "ไม่รวมค่าเดินทาง" */
+  priceNote?: string;
 }
 
 export interface ComparisonSession {
@@ -56,7 +71,10 @@ export interface ComparisonSession {
 export interface AnalyzeInspectionResponse {
   success: boolean;
   company: string;
+  companyNameFromDoc?: string;  // ชื่อบริษัทที่ AI สกัดได้จากเอกสาร
   items: InspectionItem[];
+  price?: number | null;
+  priceNote?: string;
   error?: string;
 }
 

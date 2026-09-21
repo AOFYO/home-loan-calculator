@@ -129,6 +129,12 @@ export function CompanyUploadCard({ report, index, onUpdate, onRemove }: Company
   const [files, setFiles] = useState<FileItem[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
+  // ========== ราคา ==========
+  const [priceInput, setPriceInput] = useState<string>(
+    report.price != null ? String(report.price) : ''
+  );
+  const [priceNote, setPriceNote] = useState<string>(report.priceNote ?? '');
+  const [priceSource, setPriceSource] = useState<'ai' | 'manual' | undefined>(report.priceSource);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const ACCEPTED_TYPES = [
@@ -166,8 +172,20 @@ export function CompanyUploadCard({ report, index, onUpdate, onRemove }: Company
 
   const removeFile = (idx: number) => setFiles(prev => prev.filter((_, i) => i !== idx));
 
+  // sync price state → report เมื่อ user แก้ไขเอง
+  const handlePriceBlur = () => {
+    const parsed = priceInput === '' ? null : parseFloat(priceInput.replace(/,/g, ''));
+    onUpdate({
+      ...report,
+      price: isNaN(parsed as number) ? null : parsed,
+      priceNote: priceNote || undefined,
+      priceSource: priceInput === '' ? undefined : 'manual',
+    });
+    if (priceInput !== '') setPriceSource('manual');
+  };
+
   // ===============================================================
-  // ส่งไป Gemini API — พร้อม safe JSON parsing
+  // ส่งไป Gemini API
   // ===============================================================
   const handleAnalyze = async () => {
     if (files.length === 0) return;
@@ -186,27 +204,45 @@ export function CompanyUploadCard({ report, index, onUpdate, onRemove }: Company
         body: JSON.stringify(body),
       });
 
-      // ======= safe JSON parse — handle Vercel 413 / HTML error pages =======
       const contentType = res.headers.get('content-type') ?? '';
       let json: any;
       if (contentType.includes('application/json')) {
         json = await res.json();
       } else {
         const text = await res.text();
-        if (res.status === 413) {
-          throw new Error('ไฟล์รวมกันใหญ่เกิน — กรุณาลดจำนวนไฟล์หรือใช้ไฟล์ขนาดเล็กลง');
-        }
+        if (res.status === 413) throw new Error('ไฟล์รวมกันใหญ่เกิน — กรุณาลดจำนวนไฟล์หรือใช้ไฟล์ขนาดเล็กลง');
         throw new Error(`Server error ${res.status}: ${text.substring(0, 120)}`);
       }
 
       if (json.success) {
+        // ถ้า AI ได้ชื่อบริษัทจากเอกสาร และ user ยังใช้ชื่อ default อยู่ → auto-fill
+        const aiCompanyName: string | null = json.companyNameFromDoc;
+        const finalName = aiCompanyName && companyName.match(/^บริษัทตรวจบ้าน [A-Z]$/)
+          ? aiCompanyName
+          : updatedName;
+        if (aiCompanyName && finalName !== updatedName) {
+          setCompanyName(finalName);
+        }
+
+        // ถ้า AI สกัดราคาได้
+        const aiPrice: number | null = json.price;
+        const aiPriceNote: string | null = json.priceNote;
+        if (aiPrice != null) {
+          setPriceInput(String(aiPrice));
+          setPriceSource('ai');
+          if (aiPriceNote) setPriceNote(aiPriceNote);
+        }
+
         onUpdate({
           ...report,
-          company: updatedName,
+          company: finalName,
           processingStatus: 'done',
           items: json.items,
           sourceFiles: files.map(f => f.name),
           uploadedAt: new Date().toISOString(),
+          price: aiPrice ?? (priceInput !== '' ? parseFloat(priceInput.replace(/,/g, '')) : null),
+          priceNote: aiPriceNote || priceNote || undefined,
+          priceSource: aiPrice != null ? 'ai' : (priceInput !== '' ? 'manual' : undefined),
         });
       } else {
         onUpdate({ ...report, company: updatedName, processingStatus: 'error', errorMessage: json.error || 'เกิดข้อผิดพลาด' });
@@ -218,8 +254,8 @@ export function CompanyUploadCard({ report, index, onUpdate, onRemove }: Company
 
   const status = report.processingStatus;
   const totalSize = totalBase64Size(files);
-  const isSizeWarning = totalSize > MAX_TOTAL_BASE64_BYTES * 0.8; // เตือนเมื่อ >80%
-  const isSizeError = totalSize > MAX_TOTAL_BASE64_BYTES;         // บล็อกเมื่อเกิน
+  const isSizeWarning = totalSize > MAX_TOTAL_BASE64_BYTES * 0.8;
+  const isSizeError = totalSize > MAX_TOTAL_BASE64_BYTES;
 
   return (
     <div className={`rounded-2xl border-2 ${color.border} ${color.bg} overflow-hidden shadow-sm`}>
@@ -340,6 +376,57 @@ export function CompanyUploadCard({ report, index, onUpdate, onRemove }: Company
           )}
         </div>
       )}
+
+      {/* ========== ราคาที่เสนอ ========== */}
+      <div className="mx-3 mb-3 bg-white/60 rounded-xl border border-white/80 p-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-semibold text-slate-600">💰 ราคาที่เสนอ</span>
+          {priceSource === 'ai' && (
+            <span className="text-[10px] bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full font-medium">
+              🤖 AI สกัดอัตโนมัติ
+            </span>
+          )}
+          {priceSource === 'manual' && (
+            <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+              ✏️ กรอกเอง
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="ระบุราคา (บาท)"
+              value={priceInput}
+              onChange={e => {
+                setPriceInput(e.target.value);
+                if (priceSource !== 'ai') setPriceSource('manual');
+              }}
+              onBlur={handlePriceBlur}
+              disabled={status === 'processing'}
+              className="w-full pl-3 pr-10 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-400 bg-white disabled:opacity-50"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">฿</span>
+          </div>
+          {priceInput && (
+            <div className="text-sm font-semibold text-slate-700 shrink-0">
+              {Number(priceInput.replace(/,/g, '')).toLocaleString('th-TH')}
+            </div>
+          )}
+        </div>
+
+        <input
+          type="text"
+          placeholder="หมายเหตุราคา เช่น รวม VAT, ไม่รวมค่าเดินทาง"
+          value={priceNote}
+          onChange={e => setPriceNote(e.target.value)}
+          onBlur={handlePriceBlur}
+          disabled={status === 'processing'}
+          className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-400 bg-white disabled:opacity-50 text-slate-600 placeholder:text-slate-300"
+        />
+      </div>
 
       {/* Status + Action */}
       <div className="px-3 pb-3">

@@ -3,36 +3,45 @@ import { GoogleGenAI } from '@google/genai';
 
 // ============================================================
 // POST /api/analyze-inspection
-// รับไฟล์จากบริษัทตรวจบ้าน ส่งให้ Gemini วิเคราะห์
+// รับใบเสนอราคา/รายการตรวจบ้านจากบริษัท ส่งให้ Gemini วิเคราะห์
 // ============================================================
 
 const SYSTEM_PROMPT = `คุณคือผู้เชี่ยวชาญด้านการตรวจสอบบ้านและอสังหาริมทรัพย์
-งานของคุณคือการอ่านรายงานตรวจบ้านจากเอกสาร (PDF, รูปภาพ, ข้อความ) แล้วสกัดข้อมูลออกมาในรูปแบบ JSON ที่มีโครงสร้างชัดเจน
+งานของคุณคือการอ่าน "ใบเสนอราคา" หรือ "รายการที่บริษัทจะตรวจ" จากเอกสาร แล้วสกัดข้อมูลออกมาในรูปแบบ JSON ที่มีโครงสร้างชัดเจน
+
+**สำคัญ**: เอกสารเหล่านี้คือ "ข้อเสนอ" ของบริษัทตรวจบ้าน (ยังไม่ได้ตรวจจริง)
+เป้าหมายคือช่วยให้ผู้ใช้เปรียบเทียบว่าบริษัทไหนตรวจครอบคลุมมากกว่ากัน
 
 กฎการทำงาน:
-1. สกัดทุกหัวข้อที่พบในเอกสาร จัดเป็นหมวดหมู่ที่มีความหมาย (เช่น โครงสร้าง, ระบบไฟฟ้า, ระบบประปา, หลังคา, ประตูหน้าต่าง ฯลฯ)
-2. Normalize ภาษาให้เป็นภาษาไทยทั้งหมด
-3. สรุป status ของแต่ละรายการ:
-   - "ok" = ปกติ ไม่มีปัญหา
-   - "warning" = มีสิ่งที่ควรระวังหรือซ่อมแซมในอนาคต
-   - "critical" = มีปัญหาเร่งด่วน ต้องซ่อมทันที
-   - "not_checked" = ไม่ได้ระบุหรือไม่ได้ตรวจ
-4. ระบุ severity:
-   - "high" = ความเสียหายรุนแรง ส่งผลต่อความปลอดภัยหรือโครงสร้าง
-   - "medium" = ความเสียหายระดับปานกลาง ควรแก้ไขภายใน 6 เดือน
-   - "low" = ความเสียหายเล็กน้อย สามารถเลื่อนได้
-5. detail ควรกระชับ ไม่เกิน 100 ตัวอักษร
-6. ถ้าเอกสารมีหลายไฟล์ ให้รวมข้อมูลจากทุกไฟล์เข้าด้วยกัน
+1. สกัดชื่อบริษัทจากเอกสาร (ถ้าพบ) ใส่ใน "companyName"
+2. สกัดราคาที่เสนอ (ถ้าพบ) ใส่ใน "price" เป็นตัวเลขเท่านั้น ไม่มีหน่วย
+   - หมายเหตุราคา เช่น "รวม VAT", "ไม่รวมค่าเดินทาง" ใส่ใน "priceNote"
+   - ถ้าไม่พบราคา ให้ใส่ null
+3. สกัดทุกหัวข้อที่บริษัทเสนอว่าจะตรวจ จัดเป็นหมวดหมู่ภาษาไทย
+   (เช่น โครงสร้าง, ระบบไฟฟ้า, ระบบประปา, หลังคา, ประตูหน้าต่าง, ฝ้าเพดาน ฯลฯ)
+4. status ของแต่ละรายการ:
+   - "included" = อยู่ในรายการตรวจของบริษัทนี้
+   - "not_included" = ไม่อยู่ในรายการ (ใช้เฉพาะเมื่อเอกสารระบุชัดว่าไม่รวม)
+5. severity = ความสำคัญของหัวข้อนั้นในเชิงคุณภาพบ้าน:
+   - "high" = สำคัญมาก เช่น โครงสร้าง ไฟฟ้า ประปา
+   - "medium" = สำคัญปานกลาง เช่น งานสี ประตู หน้าต่าง
+   - "low" = รายละเอียด เช่น อุปกรณ์ตกแต่ง
+6. detail = สิ่งที่บริษัทระบุว่าจะตรวจในหัวข้อนั้น (กระชับ ≤100 ตัวอักษร)
+7. Normalize ภาษาให้เป็นภาษาไทยทั้งหมด
+8. ถ้ามีหลายไฟล์ ให้รวมข้อมูลจากทุกไฟล์
 
 ตอบในรูปแบบ JSON เท่านั้น ห้ามมีข้อความอื่น:
 {
+  "companyName": "ชื่อบริษัท หรือ null ถ้าไม่พบ",
+  "price": 12500,
+  "priceNote": "รวม VAT แล้ว / null ถ้าไม่พบ",
   "items": [
     {
       "category": "ชื่อหมวดหมู่",
       "topic": "ชื่อหัวข้อย่อย",
-      "status": "ok|warning|critical|not_checked",
-      "detail": "รายละเอียดสั้นๆ",
-      "severity": "low|medium|high"
+      "status": "included",
+      "detail": "รายละเอียดที่บริษัทระบุ",
+      "severity": "high|medium|low"
     }
   ]
 }`;
@@ -46,7 +55,6 @@ const MODEL_FALLBACK_LIST = [
 ];
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -54,13 +62,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'Method not allowed' });
 
-  // ตรวจ API key
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return res.status(500).json({ success: false, error: 'GEMINI_API_KEY not configured' });
   }
 
-  // Parse request
   const { company, files } = req.body as {
     company: string;
     files: { name: string; type: string; base64: string }[];
@@ -70,7 +76,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ success: false, error: 'กรุณาระบุชื่อบริษัทและไฟล์อย่างน้อย 1 ไฟล์' });
   }
 
-  // ตรวจขนาดรวม (base64 byte count)
+  // ตรวจขนาดรวม
   const totalBase64Bytes = files.reduce((sum, f) => sum + f.base64.length, 0);
   const totalDecodedMB = (totalBase64Bytes * 0.75 / 1048576).toFixed(1);
   console.log(`[analyze-inspection] company="${company}" files=${files.length} decoded≈${totalDecodedMB}MB`);
@@ -84,10 +90,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const ai = new GoogleGenAI({ apiKey });
 
-  // สร้าง parts สำหรับ Gemini (multimodal)
   const parts: any[] = [
     {
-      text: `วิเคราะห์รายงานตรวจบ้านของ "${company}" จากเอกสารต่อไปนี้ (${files.length} ไฟล์):\n${SYSTEM_PROMPT}`,
+      text: `วิเคราะห์ใบเสนอราคา/รายการตรวจบ้านของ "${company}" จากเอกสารต่อไปนี้ (${files.length} ไฟล์):\n${SYSTEM_PROMPT}`,
     },
   ];
 
@@ -100,9 +105,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     parts.push({ text: `(ไฟล์: ${file.name})` });
   }
 
-  // ===============================================================
-  // ลอง model ตามลำดับ fallback
-  // ===============================================================
   let lastError: any = null;
 
   for (const modelName of MODEL_FALLBACK_LIST) {
@@ -121,20 +123,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const rawText = response.text ?? '';
 
-      // Parse JSON
-      let parsed: { items: any[] };
+      let parsed: { companyName?: string | null; price?: number | null; priceNote?: string | null; items: any[] };
       try {
         const cleaned = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
         parsed = JSON.parse(cleaned);
       } catch {
         console.error(`[analyze-inspection] JSON parse error from ${modelName}:`, rawText.substring(0, 300));
-        // ถ้า parse ไม่ได้ ลอง model ถัดไป
         lastError = new Error('AI ตอบในรูปแบบที่ไม่ถูกต้อง');
         continue;
       }
 
-      // Validate
-      const validStatuses = ['ok', 'warning', 'critical', 'not_checked'];
+      // Validate items
+      const validStatuses = ['included', 'not_included', 'ok', 'warning', 'critical', 'not_checked'];
       const validSeverities = ['low', 'medium', 'high'];
       const items = (parsed.items || []).filter(
         (item: any) =>
@@ -143,25 +143,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           validSeverities.includes(item.severity)
       );
 
-      console.log(`[analyze-inspection] success with ${modelName}, items=${items.length}`);
+      // Normalize legacy statuses → new ones
+      const normalizedItems = items.map((item: any) => ({
+        ...item,
+        status: item.status === 'ok' || item.status === 'warning' || item.status === 'critical'
+          ? 'included'
+          : item.status,
+      }));
 
-      return res.status(200).json({ success: true, company, items, model: modelName });
+      console.log(`[analyze-inspection] success with ${modelName}, items=${normalizedItems.length}, price=${parsed.price}`);
+
+      return res.status(200).json({
+        success: true,
+        company,
+        companyNameFromDoc: parsed.companyName || null,
+        items: normalizedItems,
+        price: typeof parsed.price === 'number' ? parsed.price : null,
+        priceNote: parsed.priceNote || null,
+        model: modelName,
+      });
 
     } catch (err: any) {
       const msg: string = err?.message ?? String(err);
-      // ถ้าเป็น 404 (model ไม่มี) → ลองตัวถัดไป
       if (msg.includes('404') || msg.includes('NOT_FOUND') || msg.includes('no longer available') || msg.includes('not found')) {
         console.warn(`[analyze-inspection] model ${modelName} unavailable, trying next...`);
         lastError = err;
         continue;
       }
-      // Error อื่น (quota, auth, network) → หยุดทันที
       console.error(`[analyze-inspection] fatal error with ${modelName}:`, msg);
       return res.status(500).json({ success: false, error: msg });
     }
   }
 
-  // ลองครบทุก model แล้วยังไม่ได้
   console.error('[analyze-inspection] all models exhausted');
   return res.status(500).json({
     success: false,
