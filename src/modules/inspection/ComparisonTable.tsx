@@ -138,11 +138,36 @@ export function ComparisonTable({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 print:space-y-4">
+      {/* Print Only Official Document Header */}
+      <div className="hidden print:block mb-4 pb-3 border-b-2 border-slate-800">
+        <div className="flex items-start justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-black text-slate-900">
+                รายงานเปรียบเทียบข้อเสนอและขอบเขตการตรวจรับบ้าน
+              </h1>
+              <span className="text-xs px-2.5 py-0.5 rounded bg-violet-100 text-violet-800 font-bold border border-violet-200">
+                เกณฑ์แบบบ้านแก้วมุกดา
+              </span>
+            </div>
+            <p className="text-xs text-slate-600 mt-1">
+              <strong>โครงการ / แฟ้มบันทึก:</strong> {sessionName || 'บ้านในฝัน 8'} &nbsp;|&nbsp; <strong>แบบก่อสร้างอ้างอิง:</strong> บ้าน คสล. 2 ชั้น (แบบบ้านแก้วมุกดา จอดรถขวา)
+            </p>
+          </div>
+          <div className="text-right text-[11px] text-slate-500 shrink-0">
+            <p className="font-semibold text-slate-700">
+              วันที่พิมพ์: {new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })} น.
+            </p>
+            <p>เปรียบเทียบทั้งหมด: {reports.length} บริษัท</p>
+          </div>
+        </div>
+      </div>
+
       {/* ========================================================= */}
       {/* 1. Summary Cards (ราคา, Coverage มาตรฐาน, เงื่อนไขบริการ) */}
       {/* ========================================================= */}
-      <div className={`grid gap-4 ${reports.length <= 2 ? 'grid-cols-1 md:grid-cols-2' : reports.length === 3 ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'}`}>
+      <div className={`grid gap-4 ${reports.length <= 2 ? 'grid-cols-1 md:grid-cols-2 print:grid-cols-2' : reports.length === 3 ? 'grid-cols-1 md:grid-cols-3 print:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 print:grid-cols-4'} print:gap-3 print-avoid-break mb-6`}>
         {reports.map((report, idx) => {
           const stats = companyCoverageStats.find(s => s.reportId === report.id);
           const palette = COMPANY_PALETTES[idx % COMPANY_PALETTES.length];
@@ -152,7 +177,7 @@ export function ComparisonTable({
           return (
             <div
               key={report.id}
-              className={`rounded-2xl border-2 ${palette.border} ${palette.bg} p-4 shadow-sm space-y-3 bg-white`}
+              className={`rounded-2xl border-2 ${palette.border} ${palette.bg} p-4 shadow-sm space-y-3 bg-white print:border print:border-slate-300 print:shadow-none print:p-3 print:rounded-xl print-avoid-break`}
             >
               {/* Company Title */}
               <div className="flex items-center justify-between">
@@ -234,7 +259,7 @@ export function ComparisonTable({
       {/* ========================================================= */}
       {/* 2. Controls & Tabs */}
       {/* ========================================================= */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white rounded-2xl border border-slate-200 p-4 shadow-sm print:hidden">
         {/* View Switcher Tabs */}
         <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
           <button
@@ -322,7 +347,7 @@ export function ComparisonTable({
       </div>
 
       {saveSuccessMsg && (
-        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center gap-2">
+        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center gap-2 print:hidden">
           <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
           <span>{saveSuccessMsg}</span>
         </div>
@@ -331,34 +356,135 @@ export function ComparisonTable({
       {/* ========================================================= */}
       {/* TAB 1: ตารางเทียบตามเกณฑ์มาตรฐานแบบบ้านแก้วมุกดา */}
       {/* ========================================================= */}
-      {activeTab === 'standard' && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="p-4 bg-slate-50/80 border-b border-slate-200 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <ShieldCheck size={18} className="text-violet-600" />
-              <div>
-                <h3 className="text-xs font-bold text-slate-800">
-                  เกณฑ์มาตรฐานการตรวจบ้าน คสล. 2 ชั้น (อ้างอิงแบบบ้านแก้วมุกดา จอดรถขวา)
-                </h3>
-                <p className="text-[10px] text-slate-500">
-                  แสดงรายการที่แต่ละบริษัทครอบคลุม พร้อมรายละเอียดวิธีตรวจและเครื่องมือ
-                </p>
-              </div>
+      <div className={`${activeTab === 'standard' ? 'block' : 'hidden print:block'} bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden print:overflow-visible print:border print:border-slate-300 print:rounded-xl print:shadow-none mb-6`}>
+        <div className="p-4 bg-slate-50/80 border-b border-slate-200 flex items-center justify-between print:bg-slate-100 print:py-2.5 print:px-4">
+          <div className="flex items-center gap-2">
+            <ShieldCheck size={18} className="text-violet-600 print:text-slate-800" />
+            <div>
+              <h3 className="text-xs font-bold text-slate-800 print:text-sm">
+                ส่วนที่ 1: ตารางเปรียบเทียบตามเกณฑ์มาตรฐานแบบบ้านแก้วมุกดา ({KAEW_MUKDA_STANDARD_CHECKLIST.length} รายการ)
+              </h3>
+              <p className="text-[10px] text-slate-500 print:text-[11px] print:text-slate-600">
+                แสดงรายการที่แต่ละบริษัทครอบคลุม พร้อมรายละเอียดวิธีตรวจและเครื่องมือ
+              </p>
             </div>
-            <span className="text-xs text-slate-500 font-medium">
-              แสดง {filteredStandardItems.length} จาก {KAEW_MUKDA_STANDARD_CHECKLIST.length} รายการ
-            </span>
           </div>
+          <span className="text-xs text-slate-500 font-medium print:text-[11px]">
+            แสดง {filteredStandardItems.length} จาก {KAEW_MUKDA_STANDARD_CHECKLIST.length} รายการ
+          </span>
+        </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead className="bg-slate-50 border-b border-slate-200">
+        <div className="overflow-x-auto print:overflow-visible">
+          <table className="w-full text-left text-xs border-collapse print:text-[11px]">
+            <thead className="bg-slate-50 border-b border-slate-200 print:bg-slate-100 print:border-b-2 print:border-slate-300" style={{ display: 'table-header-group' }}>
+              <tr>
+                <th className="py-3 px-4 font-semibold text-slate-600 w-48 print:w-40 print:py-2 print:px-2 print:text-slate-800">หมวดหมู่มาตรฐาน</th>
+                <th className="py-3 px-4 font-semibold text-slate-700 w-64 print:w-60 print:py-2 print:px-2 print:text-slate-800">หัวข้อตรวจมาตรฐาน & อ้างอิงแบบ</th>
+                <th className="py-3 px-3 font-semibold text-slate-600 w-24 text-center print:w-20 print:py-2 print:px-1 print:text-slate-800">ความสำคัญ</th>
+                {reports.map((r, idx) => (
+                  <th key={r.id} className="py-3 px-4 font-semibold text-slate-800 min-w-[200px] print:min-w-0 print:py-2 print:px-2">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold ${COMPANY_PALETTES[idx % 5].badge}`}>
+                        {String.fromCharCode(65 + idx)}
+                      </span>
+                      <span>{r.company}</span>
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredStandardItems.map((stdItem) => {
+                const matchStatusList = reports.map(r => !!findStandardItemMatch(r, stdItem));
+                const hasDiscrepancy = new Set(matchStatusList).size > 1; // บางเจ้ามี บางเจ้าไม่มี
+
+                return (
+                  <tr
+                    key={stdItem.id}
+                    className={`${hasDiscrepancy ? 'bg-amber-50/20' : ''} hover:bg-slate-50 transition-colors print:break-inside-avoid print:border-b print:border-slate-200`}
+                  >
+                    {/* Category */}
+                    <td className="py-3.5 px-4 font-medium text-slate-500 align-top print:py-2 print:px-2 print:text-slate-800">
+                      {stdItem.category}
+                    </td>
+
+                    {/* Topic & Description */}
+                    <td className="py-3.5 px-4 align-top space-y-1 print:py-2 print:px-2">
+                      <div className="flex items-baseline gap-1.5 flex-wrap">
+                        <span className="font-bold text-slate-800">{stdItem.topic}</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-mono print:border print:border-slate-200">
+                          แบบ {stdItem.referenceDoc}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 leading-snug print:text-slate-600">{stdItem.description}</p>
+                    </td>
+
+                    {/* Importance */}
+                    <td className="py-3.5 px-3 text-center align-top print:py-2 print:px-1">
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-medium border ${IMPORTANCE_CONFIG[stdItem.importance].badge}`}>
+                        {IMPORTANCE_CONFIG[stdItem.importance].dot} {IMPORTANCE_CONFIG[stdItem.importance].label}
+                      </span>
+                    </td>
+
+                    {/* Company Columns */}
+                    {reports.map((report) => {
+                      const match = findStandardItemMatch(report, stdItem);
+
+                      return (
+                        <td key={report.id} className="py-3.5 px-4 align-top print:py-2 print:px-2">
+                          {match ? (
+                            <div className="space-y-1 bg-emerald-50/60 rounded-xl p-2.5 border border-emerald-100 print:bg-emerald-50/40 print:p-1.5 print:rounded-lg print:border-slate-200">
+                              <div className="flex items-center gap-1.5 text-emerald-700 font-semibold text-xs print:text-[11px]">
+                                <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                                <span>รวมในรายการตรวจ</span>
+                              </div>
+                              {match.detail && (
+                                <p className="text-[11px] text-slate-600 leading-relaxed pl-4 print:text-[10px] print:pl-3">
+                                  {match.detail}
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5 text-slate-400 text-xs py-1 px-2 print:text-[11px] print:px-1">
+                              <XCircle size={13} className="text-slate-300 shrink-0" />
+                              <span>ไม่ได้ระบุในข้อเสนอ</span>
+                            </div>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ========================================================= */}
+      {/* TAB 2: รายการตรวจพิเศษ & เงื่อนไขการให้บริการ */}
+      {/* ========================================================= */}
+      <div className={`space-y-6 ${activeTab === 'special' ? 'block' : 'hidden print:block print:pt-4 print:break-before-page'}`}>
+        {/* Section 2.1: ตารางเงื่อนไขการให้บริการ */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden print:overflow-visible print:border print:border-slate-300 print:rounded-xl print:shadow-none print-avoid-break mb-6">
+          <div className="p-4 bg-slate-50/80 border-b border-slate-200 flex items-center gap-2 print:bg-slate-100 print:py-2.5 print:px-4">
+            <Clock size={16} className="text-violet-600 print:text-slate-800" />
+            <div>
+              <h3 className="text-xs font-bold text-slate-800 print:text-sm">
+                ส่วนที่ 2: เงื่อนไขการให้บริการและสัญญา (Service Terms Comparison)
+              </h3>
+              <p className="text-[10px] text-slate-500 print:text-[11px] print:text-slate-600">
+                เปรียบเทียบรอบเข้าตรวจ จำนวนทีมงาน กำหนดส่งเล่ม และเครื่องมือตรวจ
+              </p>
+            </div>
+          </div>
+          <div className="overflow-x-auto print:overflow-visible">
+            <table className="w-full text-left text-xs border-collapse print:text-[11px]">
+              <thead className="bg-slate-50 border-b border-slate-200 print:bg-slate-100 print:border-b-2 print:border-slate-300" style={{ display: 'table-header-group' }}>
                 <tr>
-                  <th className="py-3 px-4 font-semibold text-slate-600 w-48">หมวดหมู่มาตรฐาน</th>
-                  <th className="py-3 px-4 font-semibold text-slate-700 w-64">หัวข้อตรวจมาตรฐาน & อ้างอิงแบบ</th>
-                  <th className="py-3 px-3 font-semibold text-slate-600 w-24 text-center">ความสำคัญ</th>
+                  <th className="py-3 px-4 font-semibold text-slate-600 w-56 print:w-52 print:py-2 print:px-2 print:text-slate-800">เงื่อนไขการให้บริการ</th>
                   {reports.map((r, idx) => (
-                    <th key={r.id} className="py-3 px-4 font-semibold text-slate-800 min-w-[200px]">
+                    <th key={r.id} className="py-3 px-4 font-semibold text-slate-800 min-w-[200px] print:min-w-0 print:py-2 print:px-2">
                       <div className="flex items-center gap-2">
                         <span className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold ${COMPANY_PALETTES[idx % 5].badge}`}>
                           {String.fromCharCode(65 + idx)}
@@ -370,94 +496,111 @@ export function ComparisonTable({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredStandardItems.map((stdItem) => {
-                  const matchStatusList = reports.map(r => !!findStandardItemMatch(r, stdItem));
-                  const hasDiscrepancy = new Set(matchStatusList).size > 1; // บางเจ้ามี บางเจ้าไม่มี
+                {/* รอบตรวจ */}
+                <tr className="print:border-b print:border-slate-200">
+                  <td className="py-3 px-4 font-semibold text-slate-700 print:py-2 print:px-2">🔄 จำนวนรอบที่เข้าตรวจ</td>
+                  {reports.map(r => (
+                    <td key={r.id} className="py-3 px-4 text-slate-800 print:py-2 print:px-2">
+                      {r.serviceTerms?.rounds || <span className="text-slate-400 italic">ไม่ระบุ</span>}
+                    </td>
+                  ))}
+                </tr>
 
-                  return (
-                    <tr
-                      key={stdItem.id}
-                      className={`${hasDiscrepancy ? 'bg-amber-50/20' : ''} hover:bg-slate-50 transition-colors`}
-                    >
-                      {/* Category */}
-                      <td className="py-3.5 px-4 font-medium text-slate-500 align-top">
-                        {stdItem.category}
-                      </td>
+                {/* จำนวนทีมงาน */}
+                <tr className="print:border-b print:border-slate-200">
+                  <td className="py-3 px-4 font-semibold text-slate-700 print:py-2 print:px-2">👷‍♂️ จำนวนคนในทีมตรวจ</td>
+                  {reports.map(r => (
+                    <td key={r.id} className="py-3 px-4 text-slate-800 print:py-2 print:px-2">
+                      {r.serviceTerms?.teamSize || <span className="text-slate-400 italic">ไม่ระบุ</span>}
+                    </td>
+                  ))}
+                </tr>
 
-                      {/* Topic & Description */}
-                      <td className="py-3.5 px-4 align-top space-y-1">
-                        <div className="flex items-baseline gap-1.5 flex-wrap">
-                          <span className="font-bold text-slate-800">{stdItem.topic}</span>
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-mono">
-                            แบบ {stdItem.referenceDoc}
-                          </span>
+                {/* เวลาส่งรายงาน */}
+                <tr className="print:border-b print:border-slate-200">
+                  <td className="py-3 px-4 font-semibold text-slate-700 print:py-2 print:px-2">⏱️ กำหนดส่งมอบเล่มรายงาน</td>
+                  {reports.map(r => (
+                    <td key={r.id} className="py-3 px-4 text-slate-800 print:py-2 print:px-2">
+                      {r.serviceTerms?.reportDelivery || <span className="text-slate-400 italic">ไม่ระบุ</span>}
+                    </td>
+                  ))}
+                </tr>
+
+                {/* รูปแบบรายงาน */}
+                <tr className="print:border-b print:border-slate-200">
+                  <td className="py-3 px-4 font-semibold text-slate-700 print:py-2 print:px-2">📑 รูปแบบรายงานผลตรวจ</td>
+                  {reports.map(r => (
+                    <td key={r.id} className="py-3 px-4 text-slate-800 print:py-2 print:px-2">
+                      {r.serviceTerms?.reportFormat || <span className="text-slate-400 italic">ไม่ระบุ</span>}
+                    </td>
+                  ))}
+                </tr>
+
+                {/* เครื่องมือพิเศษ */}
+                <tr className="print:border-b print:border-slate-200">
+                  <td className="py-3 px-4 font-semibold text-slate-700 print:py-2 print:px-2">🛠️ เทคโนโลยี / เครื่องมือตรวจ</td>
+                  {reports.map(r => (
+                    <td key={r.id} className="py-3 px-4 text-slate-800 print:py-2 print:px-2">
+                      {r.serviceTerms?.specialTools && r.serviceTerms.specialTools.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {r.serviceTerms.specialTools.map((tool, i) => (
+                            <span key={i} className="px-2 py-0.5 rounded bg-violet-50 text-violet-700 font-medium text-[11px] border border-violet-100 print:border-slate-200">
+                              ✦ {tool}
+                            </span>
+                          ))}
                         </div>
-                        <p className="text-[11px] text-slate-500 leading-snug">{stdItem.description}</p>
-                      </td>
+                      ) : (
+                        <span className="text-slate-400 italic">เครื่องมือมาตรฐาน</span>
+                      )}
+                    </td>
+                  ))}
+                </tr>
 
-                      {/* Importance */}
-                      <td className="py-3.5 px-3 text-center align-top">
-                        <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-medium border ${IMPORTANCE_CONFIG[stdItem.importance].badge}`}>
-                          {IMPORTANCE_CONFIG[stdItem.importance].dot} {IMPORTANCE_CONFIG[stdItem.importance].label}
-                        </span>
-                      </td>
-
-                      {/* Company Columns */}
-                      {reports.map((report) => {
-                        const match = findStandardItemMatch(report, stdItem);
-
-                        return (
-                          <td key={report.id} className="py-3.5 px-4 align-top">
-                            {match ? (
-                              <div className="space-y-1 bg-emerald-50/60 rounded-xl p-2.5 border border-emerald-100">
-                                <div className="flex items-center gap-1.5 text-emerald-700 font-semibold text-xs">
-                                  <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
-                                  <span>รวมในรายการตรวจ</span>
-                                </div>
-                                {match.detail && (
-                                  <p className="text-[11px] text-slate-600 leading-relaxed pl-4">
-                                    {match.detail}
-                                  </p>
-                                )}
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-1.5 text-slate-400 text-xs py-1 px-2">
-                                <XCircle size={13} className="text-slate-300 shrink-0" />
-                                <span>ไม่ได้ระบุในข้อเสนอ</span>
-                              </div>
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })}
+                {/* หมายเหตุพิเศษ */}
+                <tr className="print:border-b print:border-slate-200">
+                  <td className="py-3 px-4 font-semibold text-slate-700 print:py-2 print:px-2">📝 จุดเด่นหรือการรับประกัน</td>
+                  {reports.map(r => (
+                    <td key={r.id} className="py-3 px-4 text-slate-800 print:py-2 print:px-2">
+                      {r.serviceTerms?.specialNotes || <span className="text-slate-400 italic">-</span>}
+                    </td>
+                  ))}
+                </tr>
               </tbody>
             </table>
           </div>
         </div>
-      )}
 
-      {/* ========================================================= */}
-      {/* TAB 2: รายการตรวจพิเศษ & เงื่อนไขการให้บริการ */}
-      {/* ========================================================= */}
-      {activeTab === 'special' && (
-        <div className="space-y-6">
-          {/* Section 2.1: ตารางเงื่อนไขการให้บริการ */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-4 bg-slate-50/80 border-b border-slate-200 flex items-center gap-2">
-              <Clock size={16} className="text-violet-600" />
-              <h3 className="text-xs font-bold text-slate-800">
-                เงื่อนไขการให้บริการและสัญญา (Service Terms Comparison)
-              </h3>
+        {/* Section 2.2: ตารางรายการตรวจพิเศษนอกเหนือมาตรฐาน */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden print:overflow-visible print:border print:border-slate-300 print:rounded-xl print:shadow-none print-avoid-break">
+          <div className="p-4 bg-amber-50/60 border-b border-amber-100 flex items-center justify-between print:bg-amber-50 print:py-2.5 print:px-4">
+            <div className="flex items-center gap-2">
+              <Sparkles size={16} className="text-amber-600" />
+              <div>
+                <h3 className="text-xs font-bold text-slate-800 print:text-sm">
+                  ส่วนที่ 3: รายการตรวจพิเศษนอกเหนือเกณฑ์มาตรฐาน (Special Add-on Inspections)
+                </h3>
+                <p className="text-[10px] text-slate-500 print:text-[11px] print:text-slate-600">
+                  รายการตรวจหรือนวัตกรรมพิเศษที่บางบริษัทเสนอเพิ่มเป็นจุดเด่น
+                </p>
+              </div>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead className="bg-slate-50 border-b border-slate-200">
+            <span className="text-xs text-amber-800 font-semibold print:text-[11px]">
+              {allSpecialTopics.length} รายการพิเศษ
+            </span>
+          </div>
+
+          {allSpecialTopics.length === 0 ? (
+            <div className="p-8 text-center text-slate-400 text-xs">
+              ไม่มีรายการตรวจพิเศษนอกเหนือจากรายการมาตรฐาน
+            </div>
+          ) : (
+            <div className="overflow-x-auto print:overflow-visible">
+              <table className="w-full text-left text-xs border-collapse print:text-[11px]">
+                <thead className="bg-slate-50 border-b border-slate-200 print:bg-slate-100 print:border-b-2 print:border-slate-300" style={{ display: 'table-header-group' }}>
                   <tr>
-                    <th className="py-3 px-4 font-semibold text-slate-600 w-56">เงื่อนไขการให้บริการ</th>
+                    <th className="py-3 px-4 font-semibold text-slate-600 w-64 print:w-60 print:py-2 print:px-2 print:text-slate-800">รายการตรวจพิเศษ</th>
                     {reports.map((r, idx) => (
-                      <th key={r.id} className="py-3 px-4 font-semibold text-slate-800 min-w-[200px]">
+                      <th key={r.id} className="py-3 px-4 font-semibold text-slate-800 min-w-[200px] print:min-w-0 print:py-2 print:px-2">
                         <div className="flex items-center gap-2">
                           <span className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold ${COMPANY_PALETTES[idx % 5].badge}`}>
                             {String.fromCharCode(65 + idx)}
@@ -469,157 +612,50 @@ export function ComparisonTable({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {/* รอบตรวจ */}
-                  <tr>
-                    <td className="py-3 px-4 font-semibold text-slate-700">🔄 จำนวนรอบที่เข้าตรวจ</td>
-                    {reports.map(r => (
-                      <td key={r.id} className="py-3 px-4 text-slate-800">
-                        {r.serviceTerms?.rounds || <span className="text-slate-400 italic">ไม่ระบุ</span>}
+                  {allSpecialTopics.map((spTopic) => (
+                    <tr key={spTopic.topic} className="hover:bg-slate-50 transition-colors print:break-inside-avoid print:border-b print:border-slate-200">
+                      <td className="py-3.5 px-4 font-semibold text-slate-800 print:py-2 print:px-2">
+                        <span className="inline-flex items-center gap-1.5">
+                          <Sparkles size={12} className="text-amber-500" />
+                          {spTopic.topic}
+                        </span>
                       </td>
-                    ))}
-                  </tr>
-
-                  {/* จำนวนทีมงาน */}
-                  <tr>
-                    <td className="py-3 px-4 font-semibold text-slate-700">👷‍♂️ จำนวนคนในทีมตรวจ</td>
-                    {reports.map(r => (
-                      <td key={r.id} className="py-3 px-4 text-slate-800">
-                        {r.serviceTerms?.teamSize || <span className="text-slate-400 italic">ไม่ระบุ</span>}
-                      </td>
-                    ))}
-                  </tr>
-
-                  {/* เวลาส่งรายงาน */}
-                  <tr>
-                    <td className="py-3 px-4 font-semibold text-slate-700">⏱️ กำหนดส่งมอบเล่มรายงาน</td>
-                    {reports.map(r => (
-                      <td key={r.id} className="py-3 px-4 text-slate-800">
-                        {r.serviceTerms?.reportDelivery || <span className="text-slate-400 italic">ไม่ระบุ</span>}
-                      </td>
-                    ))}
-                  </tr>
-
-                  {/* รูปแบบรายงาน */}
-                  <tr>
-                    <td className="py-3 px-4 font-semibold text-slate-700">📑 รูปแบบรายงานผลตรวจ</td>
-                    {reports.map(r => (
-                      <td key={r.id} className="py-3 px-4 text-slate-800">
-                        {r.serviceTerms?.reportFormat || <span className="text-slate-400 italic">ไม่ระบุ</span>}
-                      </td>
-                    ))}
-                  </tr>
-
-                  {/* เครื่องมือพิเศษ */}
-                  <tr>
-                    <td className="py-3 px-4 font-semibold text-slate-700">🛠️ เทคโนโลยี / เครื่องมือตรวจ</td>
-                    {reports.map(r => (
-                      <td key={r.id} className="py-3 px-4 text-slate-800">
-                        {r.serviceTerms?.specialTools && r.serviceTerms.specialTools.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {r.serviceTerms.specialTools.map((tool, i) => (
-                              <span key={i} className="px-2 py-0.5 rounded bg-violet-50 text-violet-700 font-medium text-[11px] border border-violet-100">
-                                ✦ {tool}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-slate-400 italic">เครื่องมือมาตรฐาน</span>
-                        )}
-                      </td>
-                    ))}
-                  </tr>
-
-                  {/* หมายเหตุพิเศษ */}
-                  <tr>
-                    <td className="py-3 px-4 font-semibold text-slate-700">📝 จุดเด่นหรือการรับประกัน</td>
-                    {reports.map(r => (
-                      <td key={r.id} className="py-3 px-4 text-slate-800">
-                        {r.serviceTerms?.specialNotes || <span className="text-slate-400 italic">-</span>}
-                      </td>
-                    ))}
-                  </tr>
+                      {reports.map((r) => {
+                        const item = (r.specialItems || []).find(i => i.topic === spTopic.topic);
+                        return (
+                          <td key={r.id} className="py-3.5 px-4 print:py-2 print:px-2">
+                            {item ? (
+                              <div className="bg-amber-50/70 p-2 rounded-xl border border-amber-200 text-amber-900 space-y-0.5 print:bg-amber-50/50 print:p-1.5 print:rounded-lg print:border-slate-200">
+                                <div className="font-bold flex items-center gap-1 text-xs print:text-[11px]">
+                                  <CheckCircle2 size={12} className="text-amber-600" />
+                                  มีบริการนี้
+                                </div>
+                                <p className="text-[11px] text-slate-600 print:text-[10px]">{item.detail}</p>
+                              </div>
+                            ) : (
+                              <span className="text-slate-300 text-xs">-</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
-          </div>
-
-          {/* Section 2.2: ตารางรายการตรวจพิเศษนอกเหนือมาตรฐาน */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-4 bg-amber-50/60 border-b border-amber-100 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Sparkles size={16} className="text-amber-600" />
-                <div>
-                  <h3 className="text-xs font-bold text-slate-800">
-                    รายการตรวจพิเศษนอกเหนือเกณฑ์มาตรฐาน (Special Add-on Inspections)
-                  </h3>
-                  <p className="text-[10px] text-slate-500">
-                    รายการตรวจหรือนวัตกรรมพิเศษที่บางบริษัทเสนอเพิ่มเป็นจุดเด่น
-                  </p>
-                </div>
-              </div>
-              <span className="text-xs text-amber-800 font-semibold">
-                {allSpecialTopics.length} รายการพิเศษ
-              </span>
-            </div>
-
-            {allSpecialTopics.length === 0 ? (
-              <div className="p-8 text-center text-slate-400 text-xs">
-                ไม่มีรายการตรวจพิเศษนอกเหนือจากรายการมาตรฐาน
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead className="bg-slate-50 border-b border-slate-200">
-                    <tr>
-                      <th className="py-3 px-4 font-semibold text-slate-600 w-64">รายการตรวจพิเศษ</th>
-                      {reports.map((r, idx) => (
-                        <th key={r.id} className="py-3 px-4 font-semibold text-slate-800 min-w-[200px]">
-                          <div className="flex items-center gap-2">
-                            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold ${COMPANY_PALETTES[idx % 5].badge}`}>
-                              {String.fromCharCode(65 + idx)}
-                            </span>
-                            <span>{r.company}</span>
-                          </div>
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {allSpecialTopics.map((spTopic) => (
-                      <tr key={spTopic.topic} className="hover:bg-slate-50 transition-colors">
-                        <td className="py-3.5 px-4 font-semibold text-slate-800">
-                          <span className="inline-flex items-center gap-1.5">
-                            <Sparkles size={12} className="text-amber-500" />
-                            {spTopic.topic}
-                          </span>
-                        </td>
-                        {reports.map((r) => {
-                          const item = (r.specialItems || []).find(i => i.topic === spTopic.topic);
-                          return (
-                            <td key={r.id} className="py-3.5 px-4">
-                              {item ? (
-                                <div className="bg-amber-50/70 p-2 rounded-xl border border-amber-200 text-amber-900 space-y-0.5">
-                                  <div className="font-bold flex items-center gap-1">
-                                    <CheckCircle2 size={12} className="text-amber-600" />
-                                    มีบริการนี้
-                                  </div>
-                                  <p className="text-[11px] text-slate-600">{item.detail}</p>
-                                </div>
-                              ) : (
-                                <span className="text-slate-300 text-xs">-</span>
-                              )}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+          )}
         </div>
-      )}
+      </div>
+
+      {/* Print Footer */}
+      <div className="hidden print:flex items-center justify-between pt-4 mt-6 border-t border-slate-300 text-[10px] text-slate-500 print-avoid-break">
+        <div>
+          <span>รายงานเปรียบเทียบจัดทำโดยระบบ Home Inspection Analyzer | อ้างอิงแบบบ้านแก้วมุกดา</span>
+        </div>
+        <div>
+          <span>เอกสารนี้ใช้สำหรับประกอบการตัดสินใจคัดเลือกผู้ให้บริการตรวจรับบ้าน</span>
+        </div>
+      </div>
     </div>
   );
 }

@@ -5,3 +5,86 @@
     font-family: 'Noto Sans Thai', 'Plus Jakarta Sans', sans-serif;
   }
 }
+
+/* ========================================================= */
+/* Print Optimization Styles (Multi-page Pagination & A4 Layout) */
+/* ========================================================= */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 10mm;
+  }
+
+  /* Reset layout constraints so browser can paginate across multiple pages */
+  html,
+  body,
+  #root,
+  main {
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Ensure containers with overflow/height classes don't clip pagination */
+  .overflow-hidden,
+  .overflow-y-auto,
+  .overflow-x-auto,
+  .h-screen,
+  .min-h-screen {
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+  }
+
+  /* Hide navigation, sidebar, interactive UI controls */
+  nav,
+  aside,
+  header,
+  button,
+  select,
+  input,
+  .no-print,
+  [data-no-print] {
+    display: none !important;
+  }
+
+  /* Table formatting for clean multi-page printing */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto !important;
+  }
+
+  thead {
+    display: table-header-group !important; /* Re-display header on each printed page */
+  }
+
+  tbody {
+    display: table-row-group !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  th, td {
+    word-break: break-word !important;
+  }
+
+  .print-avoid-break {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .print-break-before {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+}
