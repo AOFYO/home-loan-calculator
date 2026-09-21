@@ -549,7 +549,7 @@ export function CompanyUploadCard({ report, index, onUpdate, onRemove, disabled 
               <span className="font-semibold">AI กำลังวิเคราะห์เอกสาร...</span>
             </div>
             <span className="text-[11px] text-violet-600 font-mono">
-              โมเดล: {report.currentModel || 'Gemini 2.5 Flash'}
+              โมเดล: {report.currentModel || 'Gemini 3.5 Flash'}
             </span>
           </div>
         )}

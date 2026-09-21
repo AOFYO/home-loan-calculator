@@ -121,14 +121,18 @@ export function InspectionComparator() {
 
       while (!success && attempt < MAX_ATTEMPTS && !isCancelledRef.current) {
         attempt++;
-        // หมุนเวียนโมเดลแสดงใน UI เพื่อให้ผู้ใช้ทราบว่าระบบกำลังสลับโมเดล
+        // หมุนเวียนโมเดลเฉพาะตระกูล Gemini 3.x Flash
         const currentModelName = attempt === 1
-          ? 'Gemini 2.5 Flash'
+          ? 'Gemini 3.5 Flash'
+          : attempt % 5 === 0
+          ? 'Gemini 3.8 Flash'
+          : attempt % 4 === 0
+          ? 'Gemini 3.7 Flash'
           : attempt % 3 === 0
-          ? 'Gemini 2.0 Flash'
+          ? 'Gemini 3.6 Flash'
           : attempt % 2 === 0
-          ? 'Gemini 2.5 Flash-Lite'
-          : 'Gemini 2.0 Flash-Lite';
+          ? 'Gemini 3.5 Flash-Lite'
+          : 'Gemini 3.1 Flash-Lite';
 
         setReports(prev => prev.map((r, idx) => idx === i ? {
           ...r,
@@ -618,7 +622,7 @@ export function InspectionComparator() {
                   )}
                 </p>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  ระบบจะสลับโมเดลอัตโนมัติ (Gemini 2.5 Flash / Lite / 3.6 / 1.5) และลองใหม่จนกว่าจะสำเร็จครบทุกบริษัท
+                  ระบบจะสลับโมเดลอัตโนมัติเฉพาะตระกูล Gemini 3.x Flash (3.5 / 3.5-Lite / 3.7 / 3.6 / 3.8 / 3.1-Lite) และลองใหม่จนกว่าจะสำเร็จครบทุกบริษัท
                 </p>
               </div>
 
