@@ -2,10 +2,6 @@
 // Home Inspection Comparator — Type Definitions
 // ============================================================
 
-/**
- * ระดับความครอบคลุมของรายการตรวจในใบเสนอราคา
- * (ปรับ use case ให้ถูกต้อง: เอกสารเป็น "ใบเสนอราคา/รายการตรวจ" ไม่ใช่ผลตรวจจริง)
- */
 export type InspectionCoverage = 'included' | 'not_included';
 export type Severity = 'low' | 'medium' | 'high';
 
@@ -13,16 +9,36 @@ export type Severity = 'low' | 'medium' | 'high';
 export type InspectionStatus = InspectionCoverage;
 
 export interface InspectionItem {
-  /** หมวดหมู่หลัก (AI สร้างจากเอกสาร เช่น "โครงสร้าง", "ระบบไฟฟ้า") */
+  /** รหัสรายการมาตรฐานที่จับคู่ได้ (ถ้ามี เช่น "arch-floor", "elec-rcbo") */
+  standardItemId?: string;
+  /** หมวดหมู่หลัก (เช่น "สถาปัตยกรรมและโครงสร้าง", "ระบบวิศวกรรมไฟฟ้า") */
   category: string;
-  /** หัวข้อย่อย (เช่น "เสาและคาน", "วงจรไฟฟ้า") */
+  /** หัวข้อย่อย (เช่น "งานพื้นและกระเบื้อง", "ระบบตัดวงจรไฟฟ้ารั่ว") */
   topic: string;
   /** บริษัทนี้รวมหัวข้อนี้ในการตรวจหรือไม่ */
   status: InspectionCoverage;
   /** รายละเอียดเพิ่มเติม เช่น วิธีการตรวจ เครื่องมือที่ใช้ */
   detail: string;
-  /** ความสำคัญของหัวข้อนี้ (AI ประเมิน) */
+  /** ความสำคัญของหัวข้อนี้ */
   severity: Severity;
+}
+
+/**
+ * เงื่อนไขการให้บริการของบริษัทตรวจบ้าน
+ */
+export interface ServiceTerms {
+  /** จำนวนครั้ง/รอบที่เข้าตรวจ (เช่น "2 ครั้ง (ก่อนโอน + หลังแก้งาน)") */
+  rounds?: string;
+  /** จำนวนทีมงาน/ผู้ตรวจ (เช่น "2 คน") */
+  teamSize?: string;
+  /** ระยะเวลาส่งมอบเล่มรายงาน (เช่น "ภายใน 2-3 วันทำการ") */
+  reportDelivery?: string;
+  /** รูปแบบรายงาน (เช่น "เล่มรูปเล่มจริง + ไฟล์ PDF") */
+  reportFormat?: string;
+  /** เครื่องมือ/เทคโนโลยีพิเศษที่ใช้ (เช่น ["กล้องอินฟราเรดความร้อน (Thermal)", "โดรนบินสำรวจหลังคา", "เลเซอร์วัดระดับ"]) */
+  specialTools?: string[];
+  /** เงื่อนไขหรือจุดเด่นอื่นๆ */
+  specialNotes?: string;
 }
 
 export interface CompanyReport {
@@ -32,8 +48,12 @@ export interface CompanyReport {
   company: string;
   /** วันที่ upload */
   uploadedAt: string;
-  /** รายการหัวข้อตรวจทั้งหมด */
+  /** รายการตรวจมาตรฐานที่บริษัทนี้ครอบคลุม */
   items: InspectionItem[];
+  /** รายการตรวจพิเศษ / บริการเสริม นอกเหนือจากมาตรฐานตัวบ้าน */
+  specialItems?: InspectionItem[];
+  /** เงื่อนไขการให้บริการ (รอบตรวจ, ทีมงาน, ส่งรายงาน ฯลฯ) */
+  serviceTerms?: ServiceTerms;
   /** ชื่อไฟล์ต้นฉบับที่ upload */
   sourceFiles: string[];
   /** สถานะการประมวลผล AI */
@@ -53,7 +73,7 @@ export interface CompanyReport {
 export interface ComparisonSession {
   /** Unique ID ของ session นี้ */
   id: string;
-  /** ชื่อ session (เช่น "บ้านหมู่ 5 ถ.เพชรบุรี") */
+  /** ชื่อ session (Default: "บ้านในฝัน 8") */
   name: string;
   /** วันที่สร้าง session */
   createdAt: string;
@@ -65,16 +85,21 @@ export interface ComparisonSession {
   allTopics: string[];
   /** หมวดหมู่ทั้งหมด (สำหรับ filter) */
   allCategories: string[];
+  /** แหล่งที่มาของข้อมูลการบันทึก */
+  storageSource?: 'cloud' | 'local';
 }
 
 // DTO ที่รับจาก API /api/analyze-inspection
 export interface AnalyzeInspectionResponse {
   success: boolean;
   company: string;
-  companyNameFromDoc?: string;  // ชื่อบริษัทที่ AI สกัดได้จากเอกสาร
+  companyNameFromDoc?: string;
   items: InspectionItem[];
+  specialItems?: InspectionItem[];
+  serviceTerms?: ServiceTerms;
   price?: number | null;
   priceNote?: string;
+  model?: string;
   error?: string;
 }
 

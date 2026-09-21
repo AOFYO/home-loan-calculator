@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { Plus, Trash2, FileText, Image, FileUp, Loader2, ChevronRight } from 'lucide-react';
-import type { CompanyReport } from './types';
+import { Plus, Trash2, FileText, ChevronRight, Save, CheckCircle2, Loader2, Sparkles } from 'lucide-react';
+import type { CompanyReport, ComparisonSession } from './types';
 import { CompanyUploadCard } from './CompanyUploadCard';
 import { ComparisonTable } from './ComparisonTable';
 import { SessionList } from './SessionList';
@@ -14,6 +14,7 @@ function createEmptyReport(company: string): CompanyReport {
     company,
     uploadedAt: new Date().toISOString(),
     items: [],
+    specialItems: [],
     sourceFiles: [],
     processingStatus: 'idle',
   };
@@ -25,7 +26,10 @@ export function InspectionComparator() {
     createEmptyReport('บริษัทตรวจบ้าน B'),
   ]);
   const [view, setView] = useState<'upload' | 'compare' | 'sessions'>('upload');
-  const [sessionName, setSessionName] = useState('');
+  const [sessionName, setSessionName] = useState('บ้านในฝัน 8');
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
 
   // เพิ่มบริษัทใหม่ (max 5)
   const addCompany = () => {
@@ -47,6 +51,64 @@ export function InspectionComparator() {
   const allDone = reports.length >= 2 && reports.every(r => r.processingStatus === 'done');
   const anyProcessing = reports.some(r => r.processingStatus === 'processing');
 
+  // ============================================================
+  // ฟังก์ชันบันทึก Session (Dual Storage: Redis + LocalStorage)
+  // ============================================================
+  const handleSaveSession = async () => {
+    if (reports.length === 0) return;
+    setIsSaving(true);
+    setSaveSuccessMsg(null);
+
+    const sessionId = currentSessionId || genId();
+    if (!currentSessionId) setCurrentSessionId(sessionId);
+
+    const sessionData: ComparisonSession = {
+      id: sessionId,
+      name: sessionName.trim() || 'บ้านในฝัน 8',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      reports,
+      allTopics: Array.from(new Set(reports.flatMap(r => r.items.map(i => i.topic)))),
+      allCategories: Array.from(new Set(reports.flatMap(r => r.items.map(i => i.category)))),
+    };
+
+    // 1. บันทึกลง LocalStorage ทันที (Offline / Instant Backup)
+    try {
+      const existingLocal = JSON.parse(localStorage.getItem('inspection_sessions_backup') || '[]');
+      const filtered = existingLocal.filter((s: any) => s.id !== sessionId);
+      localStorage.setItem(
+        'inspection_sessions_backup',
+        JSON.stringify([{ ...sessionData, storageSource: 'local' }, ...filtered])
+      );
+    } catch (e) {
+      console.error('LocalStorage save error:', e);
+    }
+
+    // 2. บันทึกลง Upstash Redis ผ่าน API
+    let savedToCloud = false;
+    try {
+      const res = await fetch('/api/inspection-sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sessionData),
+      });
+      const json = await res.json();
+      if (json.success) savedToCloud = true;
+    } catch (e) {
+      console.warn('Cloud save failed, relying on local backup', e);
+    }
+
+    setIsSaving(false);
+    const timeStr = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+    setSaveSuccessMsg(
+      savedToCloud
+        ? `✅ บันทึกขึ้นคลาวด์และเครื่องแล้ว (${timeStr})`
+        : `💾 บันทึกลงเครื่องแล้ว (${timeStr})`
+    );
+
+    setTimeout(() => setSaveSuccessMsg(null), 6000);
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
@@ -57,36 +119,64 @@ export function InspectionComparator() {
               <FileText size={18} />
             </div>
             <div>
-              <h1 className="text-base font-bold text-slate-900 leading-tight">เปรียบเทียบรายการตรวจบ้าน</h1>
-              <p className="text-[10px] text-slate-500">AI วิเคราะห์และเปรียบเทียบรายหัวข้อ</p>
+              <div className="flex items-center gap-2">
+                <h1 className="text-base font-bold text-slate-900 leading-tight">เปรียบเทียบรายการตรวจบ้าน</h1>
+                <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-violet-100 text-violet-700">
+                  <Sparkles size={10} />
+                  เกณฑ์แบบบ้านแก้วมุกดา
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-500">อ้างอิงแบบก่อสร้าง คสล. 2 ชั้น (จอดรถขวา)</p>
             </div>
           </div>
 
-          {/* Tab navigation */}
-          <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
-            {([
-              { id: 'upload', label: 'อัปโหลด' },
-              { id: 'compare', label: 'เปรียบเทียบ' },
-              { id: 'sessions', label: 'ประวัติ' },
-            ] as const).map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setView(tab.id)}
-                disabled={tab.id === 'compare' && !allDone}
-                className={`
-                  px-3 py-1.5 rounded-md text-xs font-medium transition-all
-                  ${view === tab.id
-                    ? 'bg-white text-slate-900 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed'
-                  }
-                `}
-              >
-                {tab.label}
-                {tab.id === 'compare' && allDone && (
-                  <span className="ml-1 w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+          <div className="flex items-center gap-2">
+            {/* Save indicator / button */}
+            {allDone && (
+              <div className="flex items-center gap-2">
+                {saveSuccessMsg && (
+                  <span className="text-xs text-emerald-600 font-medium animate-fade-in hidden md:inline">
+                    {saveSuccessMsg}
+                  </span>
                 )}
-              </button>
-            ))}
+                <button
+                  onClick={handleSaveSession}
+                  disabled={isSaving}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition-all disabled:opacity-50"
+                  title="บันทึกประวัติการเปรียบเทียบเพื่อเปิดดูภายหลัง"
+                >
+                  {isSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                  <span>{isSaving ? 'กำลังบันทึก...' : 'บันทึกประวัติ'}</span>
+                </button>
+              </div>
+            )}
+
+            {/* Tab navigation */}
+            <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+              {([
+                { id: 'upload', label: 'อัปโหลด' },
+                { id: 'compare', label: 'เปรียบเทียบ' },
+                { id: 'sessions', label: 'ประวัติ' },
+              ] as const).map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setView(tab.id)}
+                  disabled={tab.id === 'compare' && !allDone}
+                  className={`
+                    px-3 py-1.5 rounded-md text-xs font-medium transition-all
+                    ${view === tab.id
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed'
+                    }
+                  `}
+                >
+                  {tab.label}
+                  {tab.id === 'compare' && allDone && (
+                    <span className="ml-1 w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+                  )}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -96,18 +186,28 @@ export function InspectionComparator() {
         {/* =================== VIEW: UPLOAD =================== */}
         {view === 'upload' && (
           <div className="space-y-6">
-            {/* Session name */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                ชื่อโปรเจกต์ / บ้านที่ตรวจ
-              </label>
-              <input
-                type="text"
-                placeholder="เช่น บ้านหมู่บ้านวิภาวดี แปลง A5"
-                value={sessionName}
-                onChange={e => setSessionName(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
-              />
+            {/* Session name & baseline banner */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    ชื่อโปรเจกต์ / บ้านที่ตรวจ
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="เช่น บ้านในฝัน 8"
+                    value={sessionName}
+                    onChange={e => setSessionName(e.target.value)}
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent font-medium text-slate-800"
+                  />
+                </div>
+                <div className="sm:w-80 bg-violet-50 rounded-xl p-3 border border-violet-100 text-xs">
+                  <p className="font-semibold text-violet-800 mb-0.5">📐 เกณฑ์อ้างอิง: บ้านแก้วมุกดา (จอดขวา)</p>
+                  <p className="text-violet-600 text-[11px] leading-relaxed">
+                    เปรียบเทียบตามแบบก่อสร้างจริง สถาปัตย์ (A1-A7), ไฟฟ้า (E1-E4), สุขาภิบาล (SN1-SN4) พร้อมแยกบริการพิเศษ
+                  </p>
+                </div>
+              </div>
             </div>
 
             {/* Company cards */}
@@ -127,7 +227,7 @@ export function InspectionComparator() {
                 <button
                   onClick={addCompany}
                   className="
-                    flex flex-col items-center justify-center gap-3 h-48
+                    flex flex-col items-center justify-center gap-3 h-52
                     rounded-2xl border-2 border-dashed border-slate-300
                     text-slate-400 hover:border-violet-400 hover:text-violet-500
                     transition-colors duration-200 bg-white
@@ -141,13 +241,13 @@ export function InspectionComparator() {
             </div>
 
             {/* Action footer */}
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-slate-500">
+            <div className="flex items-center justify-between bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+              <p className="text-xs text-slate-600">
                 {anyProcessing
-                  ? '⏳ AI กำลังวิเคราะห์เอกสาร...'
+                  ? '⏳ AI กำลังวิเคราะห์เอกสารและจับคู่กับแบบบ้านแก้วมุกดา...'
                   : allDone
-                  ? '✅ วิเคราะห์ครบแล้ว — พร้อมเปรียบเทียบ!'
-                  : `อัปโหลดไฟล์ให้ครบ ${reports.length} บริษัท แล้วกด "วิเคราะห์"`
+                  ? '✅ วิเคราะห์ครบทุกบริษัทแล้ว — กดดูผลเปรียบเทียบได้เลย'
+                  : `อัปโหลดเอกสารข้อเสนอให้ครบ ${reports.length} บริษัท แล้วกด "ให้ AI วิเคราะห์"`
                 }
               </p>
               <button
@@ -172,6 +272,9 @@ export function InspectionComparator() {
           <ComparisonTable
             reports={reports}
             sessionName={sessionName}
+            onSave={handleSaveSession}
+            isSaving={isSaving}
+            saveSuccessMsg={saveSuccessMsg}
           />
         )}
 
@@ -179,6 +282,7 @@ export function InspectionComparator() {
         {view === 'sessions' && (
           <SessionList
             onLoad={(session) => {
+              setCurrentSessionId(session.id);
               setReports(session.reports);
               setSessionName(session.name);
               setView('compare');

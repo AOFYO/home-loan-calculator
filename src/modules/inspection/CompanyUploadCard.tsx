@@ -238,6 +238,8 @@ export function CompanyUploadCard({ report, index, onUpdate, onRemove }: Company
           company: finalName,
           processingStatus: 'done',
           items: json.items,
+          specialItems: json.specialItems || [],
+          serviceTerms: json.serviceTerms || undefined,
           sourceFiles: files.map(f => f.name),
           uploadedAt: new Date().toISOString(),
           price: aiPrice ?? (priceInput !== '' ? parseFloat(priceInput.replace(/,/g, '')) : null),
