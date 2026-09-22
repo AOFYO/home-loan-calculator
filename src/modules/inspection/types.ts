@@ -84,6 +84,17 @@ export interface CompanyReport {
   priceNote?: string;
 }
 
+export type TimePeriodFilter = 'all' | 'today' | 'week' | 'month' | 'older';
+
+export interface StorageCapacityInfo {
+  totalCount: number;
+  maxLimit: number;
+  usagePercent: number;
+  approximateSizeKb: number;
+  cloudCount: number;
+  localCount: number;
+}
+
 export interface ComparisonSession {
   /** Unique ID ของ session นี้ */
   id: string;
@@ -101,6 +112,8 @@ export interface ComparisonSession {
   allCategories: string[];
   /** แหล่งที่มาของข้อมูลการบันทึก */
   storageSource?: 'cloud' | 'local';
+  /** ช่วงเวลาที่บันทึก (คำนวณหรือระบุไว้) */
+  periodCategory?: 'today' | 'week' | 'month' | 'older';
 }
 
 // DTO ที่รับจาก API /api/analyze-inspection

@@ -20,6 +20,7 @@ try {
 
 const SESSION_TTL = 60 * 60 * 24 * 30; // 30 วัน
 const SESSIONS_KEY = 'inspection:sessions';
+const MAX_SESSIONS = 50; // ขีดจำกัดสูงสุดที่ระบบจัดเก็บ
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -35,6 +36,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({
         success: true,
         sessions: [],
+        storageInfo: {
+          totalCount: 0,
+          maxLimit: MAX_SESSIONS,
+          usagePercent: 0,
+        },
         warning: 'Redis ไม่ได้ตั้งค่า — ประวัติจะไม่ถูกบันทึก กรุณาเพิ่ม UPSTASH_REDIS_REST_URL และ UPSTASH_REDIS_REST_TOKEN ใน Vercel',
       });
     }
@@ -50,7 +56,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // ดึง session IDs จาก sorted set (score = timestamp)
       const ids = await redis.zrange(SESSIONS_KEY, 0, -1, { rev: true });
       if (!ids || ids.length === 0) {
-        return res.status(200).json({ success: true, sessions: [] });
+        return res.status(200).json({
+          success: true,
+          sessions: [],
+          storageInfo: {
+            totalCount: 0,
+            maxLimit: MAX_SESSIONS,
+            usagePercent: 0,
+          },
+        });
       }
 
       // ดึงข้อมูลแต่ละ session
@@ -62,9 +76,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         })
       );
 
+      const validSessions = sessions.filter(Boolean);
+
       return res.status(200).json({
         success: true,
-        sessions: sessions.filter(Boolean),
+        sessions: validSessions,
+        storageInfo: {
+          totalCount: validSessions.length,
+          maxLimit: MAX_SESSIONS,
+          usagePercent: Math.min(100, Math.round((validSessions.length / MAX_SESSIONS) * 100)),
+        },
       });
     } catch (e: any) {
       return res.status(500).json({ success: false, error: e.message });
@@ -79,6 +100,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     try {
+      // Payload Sanitization: ตัด files (Base64) ขนาดใหญ่ออก คงไว้เฉพาะ sourceFiles
+      if (Array.isArray(session.reports)) {
+        session.reports = session.reports.map((r: any) => {
+          const { files, ...cleanReport } = r;
+          return cleanReport;
+        });
+      }
+
       // บันทึกข้อมูล session
       await redis.set(
         `inspection:session:${session.id}`,
@@ -92,7 +121,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         member: session.id,
       });
 
-      return res.status(200).json({ success: true });
+      // ควบคุมไม่ให้เกินโควตาสูงสุด MAX_SESSIONS (FIFO Eviction)
+      const totalCount = await redis.zcard(SESSIONS_KEY);
+      if (totalCount > MAX_SESSIONS) {
+        const excessCount = totalCount - MAX_SESSIONS;
+        const oldestIds = await redis.zrange(SESSIONS_KEY, 0, excessCount - 1);
+        if (oldestIds && oldestIds.length > 0) {
+          for (const oldId of oldestIds) {
+            await redis.del(`inspection:session:${oldId}`);
+          }
+          await redis.zremrangebyrank(SESSIONS_KEY, 0, excessCount - 1);
+        }
+      }
+
+      return res.status(200).json({
+        success: true,
+        storageInfo: {
+          totalCount: Math.min(totalCount, MAX_SESSIONS),
+          maxLimit: MAX_SESSIONS,
+          usagePercent: Math.min(100, Math.round((Math.min(totalCount, MAX_SESSIONS) / MAX_SESSIONS) * 100)),
+        },
+      });
     } catch (e: any) {
       return res.status(500).json({ success: false, error: e.message });
     }
@@ -100,10 +149,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // =============== DELETE: ลบ session ===============
   if (req.method === 'DELETE') {
-    const { id } = req.query as { id: string };
-    if (!id) return res.status(400).json({ success: false, error: 'ต้องการ id' });
+    const { id, clear } = req.query as { id?: string; clear?: string };
 
     try {
+      // ล้างข้อมูลที่เก่ากว่า 30 วัน (Bulk Cleanup)
+      if (clear === 'older_than_30_days') {
+        const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+        const oldIds = await redis.zrangebyscore(SESSIONS_KEY, 0, thirtyDaysAgo);
+        if (oldIds && oldIds.length > 0) {
+          for (const oldId of oldIds) {
+            await redis.del(`inspection:session:${oldId}`);
+          }
+          await redis.zremrangebyscore(SESSIONS_KEY, 0, thirtyDaysAgo);
+        }
+        return res.status(200).json({ success: true, removedCount: oldIds?.length || 0 });
+      }
+
+      if (!id) return res.status(400).json({ success: false, error: 'ต้องการ id' });
+
       await redis.del(`inspection:session:${id}`);
       await redis.zrem(SESSIONS_KEY, id);
       return res.status(200).json({ success: true });

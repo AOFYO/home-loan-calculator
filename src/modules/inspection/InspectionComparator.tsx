@@ -325,26 +325,42 @@ export function InspectionComparator() {
     const sessionId = currentSessionId || genId();
     if (!currentSessionId) setCurrentSessionId(sessionId);
 
+    // Payload Sanitization: ตัด files (Base64) ขนาดใหญ่ออก เพื่อประหยัดเนื้อที่จัดเก็บ >99%
+    const sanitizedReports = reports.map(r => {
+      const { files, ...cleanReport } = r;
+      return cleanReport;
+    });
+
     const sessionData: ComparisonSession = {
       id: sessionId,
       name: sessionName.trim() || 'บ้านในฝัน 8',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      reports,
-      allTopics: Array.from(new Set(reports.flatMap(r => r.items.map(i => i.topic)))),
-      allCategories: Array.from(new Set(reports.flatMap(r => r.items.map(i => i.category)))),
+      reports: sanitizedReports,
+      allTopics: Array.from(new Set(sanitizedReports.flatMap(r => r.items.map(i => i.topic)))),
+      allCategories: Array.from(new Set(sanitizedReports.flatMap(r => r.items.map(i => i.category)))),
     };
 
-    // 1. บันทึกลง LocalStorage ทันที (Offline / Instant Backup)
+    // 1. บันทึกลง LocalStorage ทันที (จำกัดสูงสุด 50 รายการล่าสุด)
+    const MAX_LOCAL_SESSIONS = 50;
     try {
       const existingLocal = JSON.parse(localStorage.getItem('inspection_sessions_backup') || '[]');
       const filtered = existingLocal.filter((s: any) => s.id !== sessionId);
+      const updatedLocal = [{ ...sessionData, storageSource: 'local' }, ...filtered].slice(0, MAX_LOCAL_SESSIONS);
       localStorage.setItem(
         'inspection_sessions_backup',
-        JSON.stringify([{ ...sessionData, storageSource: 'local' }, ...filtered])
+        JSON.stringify(updatedLocal)
       );
-    } catch (e) {
+    } catch (e: any) {
       console.error('LocalStorage save error:', e);
+      // Quota Exceeded Recovery: ถ้าพื้นที่ใกล้เต็ม ให้ลดเหลือ 20 รายการล่าสุด
+      try {
+        const existingLocal = JSON.parse(localStorage.getItem('inspection_sessions_backup') || '[]');
+        const pruned = [{ ...sessionData, storageSource: 'local' }, ...existingLocal.slice(0, 20)];
+        localStorage.setItem('inspection_sessions_backup', JSON.stringify(pruned));
+      } catch (innerErr) {
+        console.warn('LocalStorage quota recovery failed', innerErr);
+      }
     }
 
     // 2. บันทึกลง Upstash Redis ผ่าน API
